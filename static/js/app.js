@@ -50,7 +50,141 @@ async function api(url, options = {}){
   return {res, data};
 }
 
-document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+// ---------- Account card (profile button in the header) ----------
+const accountOverlay = document.getElementById('accountOverlay');
+const profileBtn = document.getElementById('profileBtn');
+
+function fillProfile(user){
+  const name = (user.full_name || '').trim();
+  const initial = name.charAt(0).toUpperCase() || '?';
+  document.getElementById('profileInitial').textContent = initial;
+  document.getElementById('acctAvatar').textContent = initial;
+  document.getElementById('acctName').textContent = name || 'Student';
+  document.getElementById('detailName').textContent = name || 'Student';
+  profileBtn.title = name ? `${name} · your account` : 'Your account';
+  if(user.email){
+    document.getElementById('detailEmail').textContent = user.email;
+    document.getElementById('detailEmailRow').hidden = false;
+  }
+}
+
+// "Profile" row (and the "Update Profile" button) show the student's details
+const profileRow = document.getElementById('profileRow');
+function toggleProfileDetails(show){
+  const details = document.getElementById('profileDetails');
+  const open = show === undefined ? details.hidden : show;
+  details.hidden = !open;
+  profileRow.setAttribute('aria-expanded', open ? 'true' : 'false');
+  profileRow.classList.toggle('open', open);
+}
+profileRow.addEventListener('click', () => toggleProfileDetails());
+document.getElementById('updateProfileBtn').addEventListener('click', () => toggleProfileDetails(true));
+
+function openAccount(){
+  accountOverlay.classList.remove('closing');
+  accountOverlay.hidden = false;
+  profileBtn.setAttribute('aria-expanded', 'true');
+  syncThemeSwitch();
+  document.getElementById('acctClose').focus();
+}
+function closeAccount(){
+  if(accountOverlay.hidden || accountOverlay.classList.contains('closing')) return;
+  // play the slide-out, then hide
+  accountOverlay.classList.add('closing');
+  const done = () => {
+    accountOverlay.classList.remove('closing');
+    accountOverlay.hidden = true;
+    toggleProfileDetails(false);
+    togglePasswordPanel(false);
+  };
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduced) done(); else setTimeout(done, 180);
+  profileBtn.setAttribute('aria-expanded', 'false');
+  profileBtn.focus();
+}
+
+// ---------- Settings: appearance (light / dark) ----------
+function syncThemeSwitch(){
+  const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  document.querySelectorAll('.theme-opt').forEach(btn => {
+    btn.setAttribute('aria-checked', btn.dataset.themeChoice === theme ? 'true' : 'false');
+  });
+  document.querySelector('.theme-switch').dataset.value = theme;
+}
+document.querySelectorAll('.theme-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // a short cross-fade so the whole page changes colour smoothly
+    document.documentElement.classList.add('theme-changing');
+    setTheme(btn.dataset.themeChoice);
+    syncThemeSwitch();
+    setTimeout(() => document.documentElement.classList.remove('theme-changing'), 400);
+  });
+});
+syncThemeSwitch();
+
+// ---------- Settings: change password ----------
+const passwordRow = document.getElementById('passwordRow');
+const passwordPanel = document.getElementById('passwordPanel');
+const passwordForm = document.getElementById('changePasswordForm');
+
+function togglePasswordPanel(show){
+  const open = show === undefined ? passwordPanel.hidden : show;
+  passwordPanel.hidden = !open;
+  passwordRow.setAttribute('aria-expanded', open ? 'true' : 'false');
+  passwordRow.classList.toggle('open', open);
+  if(!open){
+    passwordForm.reset();
+    showPasswordMessage('', '');
+  } else {
+    setTimeout(() => document.getElementById('currentPassword').focus(), 50);
+  }
+}
+passwordRow.addEventListener('click', () => togglePasswordPanel());
+
+function showPasswordMessage(error, success){
+  const err = document.getElementById('passwordError');
+  const ok = document.getElementById('passwordSuccess');
+  err.textContent = error; err.hidden = !error;
+  ok.textContent = success; ok.hidden = !success;
+  if(error){ err.classList.remove('shake'); void err.offsetWidth; err.classList.add('shake'); }
+}
+
+passwordForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const current = document.getElementById('currentPassword').value;
+  const next = document.getElementById('newPasswordSetting').value;
+  const again = document.getElementById('confirmPasswordSetting').value;
+  if(!current){ showPasswordMessage('Please enter your current password.', ''); return; }
+  if(next.length < 8){ showPasswordMessage('Your new password must be at least 8 characters.', ''); return; }
+  if(next !== again){ showPasswordMessage('The two new passwords do not match.', ''); return; }
+
+  const btn = passwordForm.querySelector('button[type="submit"]');
+  btn.disabled = true; btn.classList.add('is-busy');
+  showPasswordMessage('', '');
+  try{
+    const {res, data} = await api('/auth/password/change', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({current_password: current, new_password: next}),
+    });
+    if(!res.ok){ showPasswordMessage(data.error || 'Your password could not be changed.', ''); return; }
+    passwordForm.reset();
+    showPasswordMessage('', 'Password updated. Any other devices signed in to your account have been signed out.');
+  } catch(err){
+    if(err.message !== 'signed out') showPasswordMessage('Could not reach the server. Please try again.', '');
+  } finally {
+    btn.disabled = false; btn.classList.remove('is-busy');
+  }
+});
+
+profileBtn.addEventListener('click', openAccount);
+document.getElementById('acctClose').addEventListener('click', closeAccount);
+// clicking the dark area outside the card closes it
+accountOverlay.addEventListener('click', e => { if(e.target === accountOverlay) closeAccount(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && !accountOverlay.hidden) closeAccount(); });
+
+document.getElementById('signOutBtn').addEventListener('click', async ()=>{
+  if(!confirm('Are you sure you want to sign out?')) return;
   try{ await fetch('/auth/logout', {method: 'POST', credentials: 'same-origin'}); }
   finally{ window.location.href = '/login'; }
 });
@@ -63,8 +197,7 @@ async function boot(){
   } catch(err){
     return;   // not signed in: api() is already sending the browser to /login
   }
-  document.getElementById('userName').textContent = currentUser.full_name;
-  document.getElementById('userInitial').textContent = currentUser.full_name.trim().charAt(0).toUpperCase();
+  fillProfile(currentUser);
   const firstName = currentUser.full_name.trim().split(' ')[0];
   document.getElementById('homeName').textContent = firstName ? `, ${firstName}` : '';
 

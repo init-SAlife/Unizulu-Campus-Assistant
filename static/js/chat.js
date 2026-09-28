@@ -237,12 +237,12 @@ function updateToggleButton(){
 
 function openDrawer(){
   document.getElementById('chatSidebar').classList.add('open');
-  document.getElementById('sidebarBackdrop').hidden = false;
+  document.getElementById('sidebarBackdrop').classList.add('show');
   updateToggleButton();
 }
 function closeDrawer(){
   document.getElementById('chatSidebar').classList.remove('open');
-  document.getElementById('sidebarBackdrop').hidden = true;
+  document.getElementById('sidebarBackdrop').classList.remove('show');
   updateToggleButton();
 }
 
@@ -273,6 +273,98 @@ function escapeHtml(text){
 function formatMessage(text){
   const safe = escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   return safe.split(/\n{2,}/).map(part => `<p>${part.replace(/\n/g, '<br>')}</p>`).join('');
+}
+
+// while an answer is being typed out, a "**" that has been opened but not
+// yet closed would show as two stars -- hide it until its partner arrives
+function formatPartial(text){
+  const pairs = (text.match(/\*\*/g) || []).length;
+  if(pairs % 2 === 1){
+    const i = text.lastIndexOf('**');
+    text = text.slice(0, i) + text.slice(i + 2);
+  }
+  return formatMessage(text);
+}
+
+// is the student reading the newest message? (then new text keeps it in view)
+function nearBottom(el){ return el.scrollHeight - el.scrollTop - el.clientHeight < 90; }
+
+// ---------- Typing out an answer (top to bottom, like it's being written) ----------
+let activeTyping = null;   // the answer currently being typed, so it can be finished early
+
+function finishTyping(){
+  if(activeTyping) activeTyping.finish();
+}
+
+function typeMessage(text, token){
+  finishTyping();
+  const wrap = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = 'msg-row bot typing';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  row.appendChild(bubble);
+  wrap.appendChild(row);
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // speed: short answers ~80 characters a second; long ones finish in about 5 seconds
+  const perSecond = Math.max(80, text.length / 5);
+  const start = performance.now();
+  let shown = 0, frame = null, finished = false;
+
+  const render = count => {
+    const follow = nearBottom(wrap);
+    const done = count >= text.length;
+    bubble.innerHTML = done ? formatMessage(text) : formatPartial(text.slice(0, count)) ;
+    if(!done){
+      // blinking cursor at the end of the text
+      const caret = document.createElement('span');
+      caret.className = 'type-caret';
+      (bubble.lastElementChild || bubble).appendChild(caret);
+    }
+    if(follow) wrap.scrollTop = wrap.scrollHeight;
+  };
+
+  const finish = () => {
+    if(finished) return;
+    finished = true;
+    cancelAnimationFrame(frame);
+    render(text.length);
+    row.classList.remove('typing');
+    if(activeTyping && activeTyping.row === row) activeTyping = null;
+  };
+
+  const step = now => {
+    if(token !== viewToken){ finish(); return; }     // the student switched chats
+    // move forward to the next word boundary so words appear whole
+    let target = Math.floor((now - start) / 1000 * perSecond);
+    while(target < text.length && !/\s/.test(text[target])) target++;
+    if(target > shown){ shown = target; render(shown); }
+    if(shown >= text.length) finish();
+    else frame = requestAnimationFrame(step);
+  };
+
+  activeTyping = {row, finish};
+  if(reduced || !text) finish();
+  else {
+    wrap.scrollTop = wrap.scrollHeight;
+    frame = requestAnimationFrame(step);
+  }
+  return row;
+}
+
+// "Thinking" bubble with three bouncing dots
+function appendThinking(label){
+  const wrap = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = 'msg-row bot thinking-row';
+  row.innerHTML = `<div class="bubble thinking" role="status" aria-live="polite">
+      <span class="thinking-label">${escapeHtml(label)}</span>
+      <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+    </div>`;
+  wrap.appendChild(row);
+  wrap.scrollTop = wrap.scrollHeight;
+  return row;
 }
 
 function appendMessage(text, who, scroll = true){
@@ -334,7 +426,7 @@ async function uploadPendingFiles(files){
 
   const token = viewToken;
   appendMessage(`📎 Uploaded ${label}: ${files.map(f => f.name).join(', ')}`, 'user');
-  const thinkingRow = appendMessage('Processing document...', 'bot');
+  const thinkingRow = appendThinking('Reading your document');
   try{
     const {res, data} = await api('/upload', {method:'POST', body:formData});
     thinkingRow.remove();
@@ -342,7 +434,7 @@ async function uploadPendingFiles(files){
       if(token === viewToken) appendMessage(data.error || 'The document could not be processed.', 'bot');
       return false;
     }
-    if(token === viewToken) appendMessage(data.message, 'bot');
+    if(token === viewToken) typeMessage(data.message, token);
     afterReply(data, token);
     return true;
   } catch(err){
@@ -382,11 +474,12 @@ async function sendChat(){
     return;
   }
 
+  finishTyping();
   appendMessage(val, 'user');
   input.value = '';
 
   const token = viewToken;
-  const thinkingRow = appendMessage('Thinking...', 'bot');
+  const thinkingRow = appendThinking('Thinking');
 
   try{
     const {res, data} = await api('/chat', {
@@ -400,7 +493,7 @@ async function sendChat(){
     if(!res.ok){
       if(token === viewToken) appendMessage(data.error || 'Something went wrong. Please try again.', 'bot');
     } else {
-      if(token === viewToken) appendMessage(data.answer, 'bot');
+      if(token === viewToken) typeMessage(data.answer, token);
       afterReply(data, token);
     }
   } catch(err){

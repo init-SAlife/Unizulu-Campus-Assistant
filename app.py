@@ -14,6 +14,11 @@ from auth_routes import auth_bp, current_user  # noqa: E402
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+# The browser must always check for the newest html/js/css instead of reusing
+# an old copy, so changes to the files in static/ show up after a reload.
+# (Files that have not changed still load quickly: the server just answers
+# "not modified".)
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 # The login cookie is signed with FLASK_SECRET_KEY. Set it in .env so users
 # stay signed in when the server restarts; without it a random key is made
@@ -30,6 +35,7 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
 )
 
+
 # users, chats and chat messages are stored in the database (accounts.py)
 accounts.init_pool(Chatbot.DB_CONFIG)
 accounts.ensure_schema()
@@ -40,6 +46,15 @@ from navigation_routes import navigation_bp  # noqa: E402  Campus Navigator
 app.register_blueprint(auth_bp)
 app.register_blueprint(chatbot_bp)
 app.register_blueprint(navigation_bp)
+
+
+@app.after_request
+def no_stale_pages(response):
+    # the pages themselves (index.html, login.html, forgot-password.html) are
+    # never kept by the browser, so it always sees the newest version
+    if response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 
 @app.route("/")
@@ -54,6 +69,12 @@ def serve_login():
     if current_user():
         return redirect("/")
     return send_from_directory(app.static_folder, "login.html")
+
+
+@app.route("/forgot-password")
+def serve_forgot_password():
+    # the "Forgotten password?" link on the sign-in page opens this page
+    return send_from_directory(app.static_folder, "forgot-password.html")
 
 
 if __name__ == "__main__":

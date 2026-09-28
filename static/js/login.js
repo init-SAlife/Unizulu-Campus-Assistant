@@ -15,6 +15,7 @@ function setMode(next){
     tab.setAttribute('aria-selected', active ? 'true' : 'false');
   });
   document.querySelectorAll('.register-only').forEach(el => { el.hidden = !registering; });
+  document.querySelectorAll('.login-only').forEach(el => { el.hidden = registering; });
   submitBtn.textContent = registering ? 'Create account' : 'Sign in';
   passwordInput.autocomplete = registering ? 'new-password' : 'current-password';
   passwordInput.placeholder = registering ? 'Choose a password' : 'Your password';
@@ -27,7 +28,18 @@ function setMode(next){
 function showError(message){
   errorBox.textContent = message;
   errorBox.hidden = !message;
+  if(message){ errorBox.classList.remove('shake'); void errorBox.offsetWidth; errorBox.classList.add('shake'); }
+  if(message) document.getElementById('authNotice').hidden = true;
 }
+
+// "Forgotten password?" carries over the email that was already typed
+document.getElementById('forgotLink').addEventListener('click', event => {
+  const email = document.getElementById('email').value.trim();
+  if(email){
+    event.preventDefault();
+    window.location.href = '/forgot-password?email=' + encodeURIComponent(email);
+  }
+});
 
 document.querySelectorAll('.auth-tab').forEach(tab => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
 document.getElementById('switchMode').addEventListener('click', () => setMode(mode === 'login' ? 'register' : 'login'));
@@ -46,6 +58,7 @@ form.addEventListener('submit', async event => {
   if(mode === 'register' && body.password.length < 8){ showError('Your password must be at least 8 characters.'); return; }
 
   submitBtn.disabled = true;
+  submitBtn.classList.add('is-busy');
   showError('');
   try{
     const res = await fetch(mode === 'register' ? '/auth/register' : '/auth/login', {
@@ -64,7 +77,16 @@ form.addEventListener('submit', async event => {
     console.error(err);
   } finally {
     submitBtn.disabled = false;
+    submitBtn.classList.remove('is-busy');
   }
 });
 
 setMode('login');
+
+// back from "Forgotten password?" after choosing a new password
+if(new URLSearchParams(location.search).get('reset') === '1'){
+  const notice = document.getElementById('authNotice');
+  notice.textContent = 'Your password has been changed. Sign in with your new password.';
+  notice.hidden = false;
+  history.replaceState(null, '', '/login');
+}
