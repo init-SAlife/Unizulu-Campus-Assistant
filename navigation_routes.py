@@ -4,7 +4,7 @@ The navigator's logic lives in campus_graph.py, which builds the footpath
 network from the campus OpenStreetMap export (map.osm) and reads the
 destination list from buildings.json. Both are loaded once at start-up.
 
-Web routes (both need a signed-in user):
+Web routes (open to everyone, including guests -- campus directions are public information):
     GET  /api/campus   campus bounds, the building list and the main gate
     POST /api/route    a walking route to a building
 """
@@ -12,7 +12,6 @@ Web routes (both need a signed-in user):
 import networkx as nx
 from flask import Blueprint, jsonify, request
 
-from auth_routes import login_required
 from campus_graph import Campus, load_buildings
 
 navigation_bp = Blueprint("navigation", __name__)
@@ -40,7 +39,6 @@ for problem in CAMPUS.check_buildings(BUILDINGS, HOME["id"]):
 
 # ---------------------------------------------------------------- routes
 @navigation_bp.route("/api/campus", methods=["GET"])
-@login_required
 def api_campus():
     """Everything the map needs to start: campus bounds + the building list."""
     return jsonify({
@@ -51,7 +49,6 @@ def api_campus():
 
 
 @navigation_bp.route("/api/route", methods=["POST"])
-@login_required
 def api_route():
     """
     Body: {

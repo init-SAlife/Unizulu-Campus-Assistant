@@ -26,6 +26,8 @@
   <button type="button" id="profileBtn" class="profile-btn" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Your account" title="Your account">
     <span id="profileInitial" class="profile-initial" aria-hidden="true"></span>
   </button>
+  <!-- guests (not signed in) see this instead of the profile button -->
+  <a id="signInBtn" class="signin-btn" href="/login" aria-label="Sign in" hidden><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span class="signin-label">Sign in</span></a>
 </header>
 
 <!-- ===================== ACCOUNT (profile) CARD =====================
@@ -115,6 +117,15 @@
 
     <!-- Footer -->
     <p class="acct-footer">Secured by <strong><i class="fa-solid fa-lock"></i> unizulu</strong></p>
+
+    <!-- shown while there is more of the card below: tap to scroll down -->
+    <div class="acct-scroll-hint">
+      <div id="acctScrollFade" class="acct-scroll-fade" hidden>
+        <button type="button" id="acctScrollBtn" class="acct-scroll-btn" aria-label="Scroll down to see more">
+          <span aria-hidden="true">↓</span> More
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -137,13 +148,17 @@
           <div class="home-card-icon" aria-hidden="true">💬</div>
           <h2>AI Assistant</h2>
           <p>Ask questions about your studies and get answers from the official FSAE handbooks.</p>
-          <ul>
-            <li>Programmes, modules, electives and credits needed to graduate</li>
-            <li>Module prerequisites and admission requirements</li>
-            <li>Check your proof of registration against your programme</li>
-            <li>Upload your academic record to see what you have passed and what is still outstanding</li>
-            <li>Your chats are saved, so you can continue any chat later</li>
+          <!-- guests only: how much of the AI Assistant they can use -->
+          <p class="home-badge guest-only"><span id="homeGuestLimit">A few questions a day</span> in guest mode</p>
+          <!-- data-guest: "yes" = works in guest mode, "no" = needs an account (marked 🔒 for guests) -->
+          <ul class="home-features">
+            <li data-guest="yes">Programmes, modules, electives and credits needed to graduate</li>
+            <li data-guest="yes">Module prerequisites and admission requirements</li>
+            <li data-guest="no">Check your proof of registration against your programme</li>
+            <li data-guest="no">Upload your academic record to see what you have passed and what is still outstanding</li>
+            <li data-guest="no">Your chats are saved, so you can continue any chat later</li>
           </ul>
+          <p class="home-guest-note guest-only">🔒 These need a free account. <a href="/login">Sign in</a> or <a href="/login?mode=register">create an account</a> to unlock them.</p>
           <button type="button" class="home-btn" data-go="chatView">Use the AI Assistant</button>
         </article>
 
@@ -151,7 +166,8 @@
           <div class="home-card-icon" aria-hidden="true">📍</div>
           <h2>Campus Navigator</h2>
           <p>Find your way around the KwaDlangezwa campus.</p>
-          <ul>
+          <p class="home-badge home-badge-open guest-only">Free for everyone · no account needed</p>
+          <ul class="home-features">
             <li>Find lecture venues, faculties, the library and student offices</li>
             <li>Start from your current location or from another building</li>
             <li>See the campus on the map and get a route to where you are going</li>
@@ -185,6 +201,12 @@
       </div>
       <div class="accuracy-note">for more accurate responses please use module/programme codes if possible</div>
 
+      <!-- guests only: how many questions are left, and what signing in adds -->
+      <div id="guestBanner" class="guest-banner" hidden>
+        <span class="guest-banner-text"><strong>Guest mode</strong> · <span id="guestLeft"></span></span>
+        <span class="guest-banner-links"><a href="/login">Sign in</a> or <a href="/login?mode=register">create an account</a> to save chats and upload your academic record.</span>
+      </div>
+
       <div id="chatMessages"></div>
 
       <template id="welcomeTemplate">
@@ -197,7 +219,7 @@
               <li>Registration rules and prerequisites</li>
               <li>Campus venue directions</li>
             </ul>
-            <p>Type your question, tap the mic to speak, or attach your academic record or proof of registration.</p>
+            <p class="welcome-howto">Type your question, tap the mic to speak, or attach your academic record or proof of registration.</p>
           </div>
         </div>
       </template>

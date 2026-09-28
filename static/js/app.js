@@ -35,11 +35,15 @@ document.querySelectorAll('[data-go]').forEach(btn=>{
   btn.addEventListener('click', ()=> showView(btn.dataset.go));
 });
 
-// ---------- Signed-in user and API calls ----------
+// ---------- Signed-in user (or guest) and API calls ----------
 let currentUser = null;
+// guest mode: not signed in. The Campus Navigator works fully; the AI
+// Assistant allows a few questions a day (see guest.py on the server)
+let isGuest = false;
 
-// every call to the backend goes through here: if the sign-in has expired
-// (401), go back to the login page instead of showing a broken chat
+// every call to the backend goes through here: if the sign-in has expired,
+// or a guest reaches something that needs an account (401), go to the
+// sign-in page instead of showing a broken chat
 async function api(url, options = {}){
   const res = await fetch(url, {credentials: 'same-origin', ...options});
   if(res.status === 401){
@@ -80,11 +84,34 @@ function toggleProfileDetails(show){
 profileRow.addEventListener('click', () => toggleProfileDetails());
 document.getElementById('updateProfileBtn').addEventListener('click', () => toggleProfileDetails(true));
 
+// ---------- Account card: "More" button while there is more to scroll to ----------
+const accountPanel = document.getElementById('accountPanel');
+const acctScrollBtn = document.getElementById('acctScrollBtn');
+
+function updateAccountScroll(){
+  const more = accountPanel.scrollHeight - accountPanel.scrollTop - accountPanel.clientHeight > 12;
+  document.getElementById('acctScrollFade').hidden = !more;
+}
+acctScrollBtn.addEventListener('click', () => {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  accountPanel.scrollBy({top: accountPanel.clientHeight * 0.7, behavior: reduced ? 'auto' : 'smooth'});
+});
+accountPanel.addEventListener('scroll', updateAccountScroll, {passive: true});
+window.addEventListener('resize', () => { if(!accountOverlay.hidden) updateAccountScroll(); });
+// opening "Profile" or "Change password" makes the card longer
+new ResizeObserver(() => { if(!accountOverlay.hidden) updateAccountScroll(); })
+  .observe(document.querySelector('.acct-menu'));
+document.querySelectorAll('.acct-details, .acct-collapse').forEach(el => {
+  new MutationObserver(updateAccountScroll).observe(el, {attributes: true, attributeFilter: ['hidden']});
+});
+
 function openAccount(){
   accountOverlay.classList.remove('closing');
   accountOverlay.hidden = false;
   profileBtn.setAttribute('aria-expanded', 'true');
   syncThemeSwitch();
+  accountPanel.scrollTop = 0;
+  requestAnimationFrame(updateAccountScroll);
   document.getElementById('acctClose').focus();
 }
 function closeAccount(){
@@ -189,21 +216,58 @@ document.getElementById('signOutBtn').addEventListener('click', async ()=>{
   finally{ window.location.href = '/login'; }
 });
 
+// ---------- Guest mode ----------
+function startGuestMode(allowance){
+  isGuest = true;
+  document.body.classList.add('guest');
+  profileBtn.hidden = true;
+  document.getElementById('signInBtn').hidden = false;
+  document.getElementById('homeName').textContent = '';
+  if(allowance && allowance.limit){
+    document.getElementById('homeGuestLimit').textContent =
+      `${allowance.limit} question${allowance.limit === 1 ? '' : 's'} a day`;
+  }
+  document.getElementById('chatInput').placeholder = 'Ask a question or speak...';
+  updateGuestAllowance(allowance);
+}
+
+// the banner above the chat: "Guest mode · 7 of 10 questions left today"
+function updateGuestAllowance(allowance){
+  if(!isGuest || !allowance) return;
+  const left = allowance.questions_left;
+  document.getElementById('guestLeft').textContent = left > 0
+    ? `${left} of ${allowance.limit} question${allowance.limit === 1 ? '' : 's'} left today`
+    : 'no questions left today';
+  const banner = document.getElementById('guestBanner');
+  banner.hidden = false;
+  banner.classList.toggle('used-up', left <= 0);
+}
+
 // ---------- Start-up: who is signed in, their chats, and which chat to show ----------
 async function boot(){
+  let me;
   try{
-    const {data} = await api('/auth/me');
-    currentUser = data.user;
+    const res = await fetch('/auth/me', {credentials: 'same-origin'});
+    me = await res.json();
   } catch(err){
-    return;   // not signed in: api() is already sending the browser to /login
+    me = {user: null, guest: null};   // server unreachable: show the page as a guest
   }
+
+  // the Home screen asks what to use; a link to a chat (/?chat=...) or to
+  // a view (/#chat, /#navigate) opens that directly
+  const chatFromUrl = new URLSearchParams(window.location.search).get('chat');
+
+  if(!me.user){
+    startGuestMode(me.guest);
+    showViewForAddress(null);
+    newChat();
+    return;
+  }
+
+  currentUser = me.user;
   fillProfile(currentUser);
   const firstName = currentUser.full_name.trim().split(' ')[0];
   document.getElementById('homeName').textContent = firstName ? `, ${firstName}` : '';
-
-  // after signing in the Home screen asks what to use; a link to a chat
-  // (/?chat=...) or to a view (/#chat, /#navigate) opens that directly
-  const chatFromUrl = new URLSearchParams(window.location.search).get('chat');
   showViewForAddress(chatFromUrl);
 
   await loadChatList();

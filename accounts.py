@@ -103,11 +103,13 @@ EXPECTED_COLUMNS = {
     "chat_messages": {"id", "session_id", "role", "content", "created_at"},
     "password_resets": {"id", "user_id", "code_hash", "attempts", "reset_token_hash",
                         "created_at", "expires_at", "used_at"},
+    "guest_chats": {"id", "context", "created_at", "updated_at"},
+    "guest_questions": {"id", "ip_hash", "created_at"},
 }
 
 
 def ensure_schema():
-    """Creates the three tables if they don't exist, then checks they have
+    """Creates the tables if they don't exist, then checks they have
     the expected columns. An older table with the same name but different
     columns (e.g. an old chat_sessions) is reported clearly instead of
     causing confusing errors later."""
@@ -435,3 +437,61 @@ def delete_chat(user_id, chat_id):
     with _cursor() as cur:
         cur.execute("DELETE FROM chat_sessions WHERE id = %s AND user_id = %s", (chat_id, user_id))
         return cur.rowcount == 1
+
+
+# ------------------------------------------------------------------ guests
+# Visitors who are not signed in can use the Campus Navigator freely and ask
+# the AI Assistant a few questions (limits are in chatbot_routes.py). A
+# guest chat's memory lives in guest_chats for a day; guest_questions only
+# counts questions so the limits work across all server workers.
+GUEST_KEEP_HOURS = 24
+
+
+def hash_ip(ip):
+    """A salted hash of a network address, so the address itself is never stored."""
+    salt = os.environ.get("FLASK_SECRET_KEY", "campus-ai-guest")
+    return _sha256(f"{salt}|{ip or 'unknown'}")
+
+
+def get_guest_chat(chat_id):
+    """The guest chat's memory, or None if it doesn't exist or has expired."""
+    chat_id = _valid_chat_id(chat_id)
+    if not chat_id:
+        return None
+    with _cursor() as cur:
+        cur.execute("""SELECT context FROM guest_chats
+                       WHERE id = %s AND updated_at > now() - %s * interval '1 hour'""",
+                    (chat_id, GUEST_KEEP_HOURS))
+        row = cur.fetchone()
+    return {"id": chat_id, "context": row[0] or {}} if row else None
+
+
+def save_guest_chat(chat_id, context):
+    """Creates or updates a guest chat. Returns its id."""
+    chat_id = _valid_chat_id(chat_id) or str(uuid.uuid4())
+    with _cursor() as cur:
+        cur.execute("""INSERT INTO guest_chats (id, context) VALUES (%s, %s)
+                       ON CONFLICT (id) DO UPDATE SET context = EXCLUDED.context, updated_at = now()""",
+                    (chat_id, Json(context)))
+    return chat_id
+
+
+def record_guest_question(ip_hash, per_ip_per_hour, all_guests_per_hour):
+    """Counts one guest question. Returns None when it is allowed, or
+    "network" / "busy" when the per-network or all-guests hourly limit is
+    already used up (then nothing is counted). Old guest rows are cleaned
+    up here too."""
+    with _cursor() as cur:
+        cur.execute("DELETE FROM guest_questions WHERE created_at < now() - interval '2 days'")
+        cur.execute("DELETE FROM guest_chats WHERE updated_at < now() - %s * interval '1 hour'",
+                    (GUEST_KEEP_HOURS,))
+        cur.execute("""SELECT count(*) FILTER (WHERE ip_hash = %s), count(*)
+                       FROM guest_questions WHERE created_at > now() - interval '1 hour'""",
+                    (ip_hash,))
+        from_network, from_everyone = cur.fetchone()
+        if from_everyone >= all_guests_per_hour:
+            return "busy"
+        if from_network >= per_ip_per_hour:
+            return "network"
+        cur.execute("INSERT INTO guest_questions (ip_hash) VALUES (%s)", (ip_hash,))
+    return None

@@ -62,3 +62,26 @@ CREATE TABLE IF NOT EXISTS password_resets (
     used_at           timestamptz                   -- set when used or replaced by a newer code
 );
 CREATE INDEX IF NOT EXISTS password_resets_user_recent ON password_resets (user_id, created_at DESC);
+
+-- Guest mode: visitors who are not signed in can ask the AI Assistant a
+-- few questions. Their chat memory is kept here for a day and then
+-- deleted; nothing is linked to a person.
+CREATE TABLE IF NOT EXISTS guest_chats (
+    id          uuid PRIMARY KEY,
+    context     jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS guest_chats_updated ON guest_chats (updated_at);
+
+-- One row per guest question, used only for the guest limits (per network
+-- per hour, and all guests together per hour). The network address is
+-- stored as a salted hash, never the address itself. Rows older than two
+-- days are deleted automatically.
+CREATE TABLE IF NOT EXISTS guest_questions (
+    id          bigserial PRIMARY KEY,
+    ip_hash     text NOT NULL,
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS guest_questions_ip_recent ON guest_questions (ip_hash, created_at);
+CREATE INDEX IF NOT EXISTS guest_questions_recent ON guest_questions (created_at);

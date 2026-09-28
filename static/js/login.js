@@ -81,7 +81,8 @@ form.addEventListener('submit', async event => {
   }
 });
 
-setMode('login');
+// "create an account" links from guest mode open the Create account tab
+setMode(new URLSearchParams(location.search).get('mode') === 'register' ? 'register' : 'login');
 
 // back from "Forgotten password?" after choosing a new password
 if(new URLSearchParams(location.search).get('reset') === '1'){

@@ -6,7 +6,7 @@ Web routes (all JSON):
     POST /auth/register   {full_name, email, password}
     POST /auth/login      {email, password}
     POST /auth/logout
-    GET  /auth/me         the signed-in user
+    GET  /auth/me         the signed-in user (or, for a guest, user null + guest allowance)
 
     POST /auth/password/change   {current_password, new_password}   (signed in)
     POST /auth/password/forgot   {email}                  emails a 6-digit code
@@ -19,6 +19,7 @@ from functools import wraps
 from flask import Blueprint, g, jsonify, request, session
 
 import accounts
+import guest
 import mailer
 
 auth_bp = Blueprint("auth", __name__)
@@ -39,8 +40,10 @@ def login_required(view):
     def wrapper(*args, **kwargs):
         user = current_user()
         if not user:
-            session.clear()
-            return jsonify({"error": "Please sign in to continue.", "login_required": True}), 401
+            # forget only the (expired) sign-in -- a guest's question count stays
+            session.pop("user_id", None)
+            session.pop("sv", None)
+            return jsonify({"error": "Please sign in to use this.", "login_required": True}), 401
         g.user = user
         return view(*args, **kwargs)
     return wrapper
@@ -88,9 +91,12 @@ def logout():
 
 
 @auth_bp.route("/auth/me", methods=["GET"])
-@login_required
 def me():
-    return jsonify({"user": g.user})
+    """The signed-in user, or for a guest: user null and their question allowance."""
+    user = current_user()
+    if user:
+        return jsonify({"user": user})
+    return jsonify({"user": None, "guest": guest.status()})
 
 
 # ---------------------------------------------------------------- passwords

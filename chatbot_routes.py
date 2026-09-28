@@ -2,7 +2,8 @@
 AI Assistant (chatbot) web routes. The chatbot's logic lives in Chatbot.py;
 each user's chats and their memory are stored through accounts.py.
 
-Web routes (all need a signed-in user):
+Web routes (all need a signed-in user, except /chat, which guests can use a
+few times a day -- see guest.py):
     POST   /chat                  ask a question in a chat (a new chat is created if no chat_id)
     POST   /upload                upload an academic record / proof of registration into a chat
     GET    /chats                 the user's chats, newest first
@@ -21,7 +22,8 @@ from werkzeug.utils import secure_filename
 
 import Chatbot
 import accounts
-from auth_routes import login_required
+import guest
+from auth_routes import current_user, login_required
 
 chatbot_bp = Blueprint("chatbot", __name__)
 
@@ -130,13 +132,17 @@ def chats_delete(chat_id):
 
 # ---------------------------------------------------------------- chatbot
 @chatbot_bp.route("/chat", methods=["POST"])
-@login_required
 def chat():
     data = request.get_json(silent=True) or {}
     question = (data.get("question") or "").strip()
 
     if not question:
         return jsonify({"error": "No question provided."}), 400
+
+    user = current_user()
+    if not user:
+        return guest_chat(question, data.get("chat_id"))
+    g.user = user
 
     conversation, error = load_chat(data.get("chat_id"))
     if error:
@@ -158,6 +164,79 @@ def chat():
                         "warning": "This answer could not be saved to your chat history."})
 
     return jsonify({"answer": answer, **chat_payload(conversation)})
+
+
+# Questions a guest can't get answered: they need the student's own
+# uploaded documents, and uploading needs an account. These are answered
+# straight away -- no Claude call, and they don't use up a guest question.
+GUEST_REGISTRATION_REPLY = (
+    "I'm sorry, I can't verify your registration because you are not signed in. "
+    "To check your registration I need your proof of registration, and uploading "
+    "documents is only available with an account.\n\n"
+    "Sign in or create a free account, upload your proof of registration, "
+    "and then ask me again."
+)
+GUEST_RECORD_REPLY = (
+    "I'm sorry, I can't check your results or progress because you are not signed in. "
+    "For that I need your academic record, and uploading documents is only "
+    "available with an account.\n\n"
+    "Sign in or create a free account, upload your academic record, and then ask me again. "
+    "In guest mode I can still answer general questions about programmes and modules."
+)
+
+
+def guest_cannot_answer(question):
+    """The reply for a question that needs a signed-in student, or None."""
+    if Chatbot.is_registration_check_question(question):
+        return GUEST_REGISTRATION_REPLY
+    if Chatbot.is_progress_question(question):
+        return GUEST_RECORD_REPLY
+    return None
+
+
+def guest_chat(question, chat_id):
+    """A question from someone who is not signed in. The chat keeps its
+    memory for the day (so follow-up questions work), but it is not saved
+    to any account and is not given a title."""
+    needs_account = guest_cannot_answer(question)
+    if needs_account:
+        # keep the chat as it was (same chat, same handbook)
+        same = chat_id if chat_id and chat_id == guest.current_chat_id() else None
+        kept = accounts.get_guest_chat(same) if same else None
+        return jsonify({"answer": needs_account, "chat_id": kept["id"] if kept else None, "title": None,
+                        "handbook": handbook_of(kept["context"]) if kept else None,
+                        "signin_prompt": True, "guest": guest.status()})
+
+    try:
+        blocked = guest.check_and_count()
+    except Exception as e:
+        print(f"[chat] error checking guest limits: {e}")
+        return jsonify({"error": "Something went wrong. Please try again."}), 500
+    if blocked:
+        return jsonify({"error": blocked, "signin_prompt": True, "guest": guest.status()}), 429
+
+    # continue this browser's guest chat only; any other id starts a new one
+    conversation = None
+    if chat_id and chat_id == guest.current_chat_id():
+        conversation = accounts.get_guest_chat(chat_id)
+    context = Chatbot.complete_context(conversation["context"]) if conversation else Chatbot.new_context()
+
+    try:
+        answer = Chatbot.answer_question(question, known_codes, context)
+    except Exception as e:
+        print(f"[chat] error answering guest question: {e}")
+        return jsonify({"error": "Something went wrong answering that question.",
+                        "guest": guest.status()}), 500
+
+    new_id = conversation["id"] if conversation else None
+    try:
+        new_id = accounts.save_guest_chat(new_id, context)
+        guest.remember_chat(new_id)
+    except Exception as e:
+        print(f"[chat] error saving guest chat: {e}")
+
+    return jsonify({"answer": answer, "chat_id": new_id, "title": None,
+                    "handbook": handbook_of(context), "guest": guest.status()})
 
 
 @chatbot_bp.route("/upload", methods=["POST"])

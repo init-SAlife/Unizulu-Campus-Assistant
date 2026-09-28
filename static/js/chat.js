@@ -13,7 +13,8 @@ let viewToken = 0;
 
 function setChatInUrl(chatId){
   if(currentView !== 'chatView') return;   // only the chat view shows a chat in the address bar
-  const url = chatId ? `/?chat=${encodeURIComponent(chatId)}` : '/#chat';
+  // a guest chat can't be reopened from a link, so it never goes in the address bar
+  const url = chatId && !isGuest ? `/?chat=${encodeURIComponent(chatId)}` : '/#chat';
   history.replaceState(null, '', url);
 }
 
@@ -148,6 +149,10 @@ function showWelcome(){
   const tpl = document.getElementById('welcomeTemplate').content.cloneNode(true);
   const first = currentUser && currentUser.full_name ? currentUser.full_name.split(' ')[0] : '';
   tpl.querySelector('.welcome-name').textContent = first ? `, ${first}` : '';
+  if(isGuest){
+    tpl.querySelector('.welcome-howto').textContent =
+      'Type your question or tap the mic to speak. Sign in to attach your academic record or proof of registration.';
+  }
   document.getElementById('chatMessages').appendChild(tpl);
 }
 
@@ -189,6 +194,7 @@ async function openChat(chatId){
 // called after every answer/upload: remember which chat it went into,
 // update its title (Claude names new chats) and move it to the top of the list
 function afterReply(data, sentFromToken){
+  if(data && data.guest) updateGuestAllowance(data.guest);
   if(!data || !data.chat_id) return;
   const stillViewing = sentFromToken === viewToken;
   if(stillViewing){
@@ -197,6 +203,7 @@ function afterReply(data, sentFromToken){
     setChatInUrl(currentChatId);
     setChatHeader(data.title, currentHandbook);
   }
+  if(isGuest) return;          // guests have no saved chat list
   const now = new Date().toISOString();
   const existing = chats.find(c => c.id === data.chat_id);
   if(existing){
@@ -367,6 +374,19 @@ function appendThinking(label){
   return row;
 }
 
+// guests who reach their limit: buttons to sign in or create an account
+function appendSignInPrompt(){
+  const wrap = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.innerHTML = `<div class="bubble signin-prompt">
+      <a class="home-btn" href="/login">Sign in</a>
+      <a class="signin-prompt-alt" href="/login?mode=register">Create a free account</a>
+    </div>`;
+  wrap.appendChild(row);
+  row.scrollIntoView({behavior:'smooth', block:'end'});
+}
+
 function appendMessage(text, who, scroll = true){
   const wrap = document.getElementById('chatMessages');
   const welcome = wrap.querySelector('.welcome');
@@ -491,9 +511,17 @@ async function sendChat(){
     thinkingRow.remove();
 
     if(!res.ok){
-      if(token === viewToken) appendMessage(data.error || 'Something went wrong. Please try again.', 'bot');
+      if(data.guest) updateGuestAllowance(data.guest);
+      if(token === viewToken){
+        appendMessage(data.error || 'Something went wrong. Please try again.', 'bot');
+        if(data.signin_prompt) appendSignInPrompt();
+      }
     } else {
-      if(token === viewToken) typeMessage(data.answer, token);
+      if(token === viewToken){
+        typeMessage(data.answer, token);
+        // e.g. a guest asking to check their registration: offer to sign in
+        if(data.signin_prompt){ finishTyping(); appendSignInPrompt(); }
+      }
       afterReply(data, token);
     }
   } catch(err){

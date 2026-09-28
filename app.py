@@ -59,8 +59,8 @@ def no_stale_pages(response):
 
 @app.route("/")
 def serve_index():
-    if not current_user():
-        return redirect("/login")
+    # open to everyone: guests get the Campus Navigator and a few AI
+    # Assistant questions (see guest.py); signing in unlocks the rest
     return send_from_directory(app.static_folder, "index.html")
 
 

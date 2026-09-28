@@ -1340,6 +1340,137 @@ html.theme-changing, html.theme-changing *, html.theme-changing *::before, html.
 .btn-link{ display:block; text-align:center; text-decoration:none; box-sizing: border-box; }
 .auth-switch .forgot-link{ font-size: 13px; }
 
+/* ===== Guest mode (not signed in) ===== */
+/* "Sign in" button in the header, where the profile button is for signed-in users */
+.signin-btn{
+  position:absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--btn);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(11,61,145,0.25);
+  transition: background .15s ease;
+}
+.signin-btn:hover{ background: var(--btn-hover); }
+.signin-btn i{ margin-right: 7px; }
+.signin-btn[hidden]{ display:none; }
+
+/* guests have no saved chats or uploads: no chat list, no attach controls */
+body.guest #chatView.active,
+body.guest #chatView.active.sidebar-collapsed{ grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+body.guest .chat-sidebar,
+body.guest .sidebar-toggle,
+body.guest .sidebar-backdrop,
+body.guest #uploadBtn,
+body.guest #documentType,
+body.guest #attachmentPreview{ display:none !important; }
+
+.home-guest-note{
+  margin: -8px 0 18px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--blue-soft);
+  color: var(--text-mid);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.home-guest-note a, .guest-banner a{ color: var(--blue); font-weight: 600; }
+
+.guest-banner{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--blue-soft);
+  color: var(--text-mid);
+  font-size: 13px;
+}
+.guest-banner[hidden]{ display:none; }
+.guest-banner-text strong{ color: var(--text); }
+.guest-banner.used-up{ border-color: var(--danger); }
+.guest-banner.used-up #guestLeft{ color: var(--danger); font-weight: 600; }
+
+.signin-prompt{ display:flex; flex-wrap: wrap; align-items:center; gap: 14px; }
+.signin-prompt .home-btn{ width:auto; margin:0; padding: 9px 18px; text-decoration:none; display:inline-block; }
+.signin-prompt-alt{ color: var(--blue); font-weight: 600; font-size: 14px; }
+
+.guest-link{ color:#fff; font-weight:700; }
+
+/* ===== Account card: never squash the sections, scroll instead ===== */
+.acct-panel{ max-height: calc(100dvh - 108px); overscroll-behavior: contain; }
+.acct-panel > *{ flex-shrink: 0; }
+/* "More" button: a faded strip along the bottom edge of the card, shown
+   while there is more below (the content fades out underneath it) */
+.acct-scroll-hint{
+  position: sticky;
+  bottom: 0;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.acct-scroll-fade{
+  position: absolute;
+  left: 0; right: 0; bottom: -8px;       /* -8px: cover the card's bottom padding too */
+  height: 72px;
+  display:flex; align-items:flex-end; justify-content:center;
+  padding-bottom: 14px;
+  background: linear-gradient(to bottom, transparent, var(--panel) 62%);
+  animation: scrollBtnIn .2s ease;
+}
+.acct-scroll-fade[hidden]{ display:none; }
+.acct-scroll-btn{
+  pointer-events: auto;
+  display:inline-flex; align-items:center; gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--btn);
+  color: #fff;
+  font: inherit;
+  font-size: 13px; font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -4px var(--shadow);
+}
+.acct-scroll-btn span{ font-size: 15px; line-height: 1; }
+.acct-scroll-btn:hover{ background: var(--btn-hover); }
+@keyframes scrollBtnIn{ from{ opacity:0; } to{ opacity:1; } }
+@media (max-width: 600px){
+  .acct-panel{ max-height: calc(100dvh - 84px); }
+}
+
+/* ===== Home: what works in guest mode, what needs an account ===== */
+.guest-only{ display:none; }
+body.guest .guest-only{ display:block; }
+.home-badge{
+  align-self: flex-start;
+  margin: -6px 0 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.home-badge-open{ background: rgba(28,124,74,0.12); color: var(--success); }
+body.guest .home-features{ list-style: none; padding-left: 0; }
+body.guest .home-features li{ position: relative; padding-left: 26px; }
+body.guest .home-features li::before{ position:absolute; left: 2px; top: 0; }
+body.guest .home-features li[data-guest="yes"]::before,
+body.guest .home-features li:not([data-guest])::before{ content: "✓"; color: var(--success); font-weight: 700; }
+body.guest .home-features li[data-guest="no"]{ color: var(--text-dim); }
+body.guest .home-features li[data-guest="no"]::before{ content: "🔒"; font-size: 12px; top: 2px; }
+
 /* ===== Small screens ===== */
 @media (max-width: 900px){
   .nav-grid, .home-choices{ grid-template-columns: 1fr; }
@@ -1385,6 +1516,10 @@ html.theme-changing, html.theme-changing *, html.theme-changing *::before, html.
   :root{ --page-chrome: 220px; }
   header{ padding: 8px 60px; }
   .profile-btn{ right: 12px; width: 38px; height: 38px; }
+  /* phones: the same small round button as the profile button, icon only */
+  .signin-btn{ right: 12px; width: 38px; height: 38px; padding: 0; display:flex; align-items:center; justify-content:center; font-size: 15px; }
+  .signin-btn .signin-label{ display:none; }
+  .signin-btn i{ margin:0; }
   .profile-initial{ font-size: 15px; }
   .acct-overlay{ padding: 72px 12px 12px; justify-content:center; }
   .brand{ gap: 10px; }
