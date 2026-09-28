@@ -6,6 +6,7 @@
 <title>Sign in · UNIZULU Campus AI Assistant</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" type="image/png" href="img/unizulu-logo.png">
+<script src="js/common.js"></script>
 </head>
 <body class="auth-page">
 
@@ -38,8 +39,12 @@
         <label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Your password" required>
         <p class="field-hint register-only" hidden>At least 8 characters.</p>
+        <div class="forgot-row login-only">
+          <a href="/forgot-password" id="forgotLink" class="forgot-link">Forgotten password?</a>
+        </div>
       </div>
 
+      <p id="authNotice" class="auth-notice" role="status" hidden></p>
       <p id="authError" class="auth-error" role="alert" hidden></p>
 
       <button id="authSubmit" type="submit" class="btn-verify">Sign in</button>

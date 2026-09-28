@@ -43,3 +43,22 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS chat_messages_session_order ON chat_messages (session_id, id);
+
+-- Bumped whenever the password changes: every sign-in cookie made before
+-- the change stops working, so other devices are signed out.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0;
+
+-- "Forgotten password?": one row per emailed code. Only hashes are stored,
+-- never the code itself. After the right code is entered, a one-time
+-- reset token (also stored as a hash) lets the student choose a new password.
+CREATE TABLE IF NOT EXISTS password_resets (
+    id                bigserial PRIMARY KEY,
+    user_id           integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code_hash         text NOT NULL,
+    attempts          integer NOT NULL DEFAULT 0,   -- wrong guesses so far
+    reset_token_hash  text,                         -- set once the right code is entered
+    created_at        timestamptz NOT NULL DEFAULT now(),
+    expires_at        timestamptz NOT NULL,
+    used_at           timestamptz                   -- set when used or replaced by a newer code
+);
+CREATE INDEX IF NOT EXISTS password_resets_user_recent ON password_resets (user_id, created_at DESC);

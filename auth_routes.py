@@ -7,6 +7,11 @@ Web routes (all JSON):
     POST /auth/login      {email, password}
     POST /auth/logout
     GET  /auth/me         the signed-in user
+
+    POST /auth/password/change   {current_password, new_password}   (signed in)
+    POST /auth/password/forgot   {email}                  emails a 6-digit code
+    POST /auth/password/verify   {email, code}            -> {reset_token}
+    POST /auth/password/reset    {email, reset_token, new_password}
 """
 
 from functools import wraps
@@ -14,13 +19,18 @@ from functools import wraps
 from flask import Blueprint, g, jsonify, request, session
 
 import accounts
+import mailer
 
 auth_bp = Blueprint("auth", __name__)
 
 
 def current_user():
     user_id = session.get("user_id")
-    return accounts.get_user(user_id) if user_id else None
+    if not user_id:
+        return None
+    # "sv" (session version) changes when the password changes, which signs
+    # out every other device that was signed in with the old password
+    return accounts.get_session_user(user_id, session.get("sv", 0))
 
 
 def login_required(view):
@@ -40,6 +50,7 @@ def sign_in(user):
     session.clear()                  # new cookie on every sign-in
     session.permanent = True
     session["user_id"] = user["id"]
+    session["sv"] = accounts.get_session_version(user["id"])
 
 
 @auth_bp.route("/auth/register", methods=["POST"])
@@ -80,3 +91,76 @@ def logout():
 @login_required
 def me():
     return jsonify({"user": g.user})
+
+
+# ---------------------------------------------------------------- passwords
+@auth_bp.route("/auth/password/change", methods=["POST"])
+@login_required
+def change_password():
+    """Settings -> Change password (needs the current password)."""
+    data = request.get_json(silent=True) or {}
+    try:
+        new_version = accounts.change_password(g.user["id"], data.get("current_password"), data.get("new_password"))
+    except accounts.AccountError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        print(f"[auth] error changing password: {exc}")
+        return jsonify({"error": "Your password could not be changed. Please try again."}), 500
+    session["sv"] = new_version          # this device stays signed in, all others are signed out
+    return jsonify({"ok": True})
+
+
+@auth_bp.route("/auth/password/forgot", methods=["POST"])
+def forgot_password():
+    """Step 1: email a 6-digit code. Answers the same whether or not the
+    email has an account, so nobody can use this page to find out who is registered."""
+    data = request.get_json(silent=True) or {}
+    try:
+        user, code = accounts.start_password_reset(data.get("email"))
+    except accounts.AccountError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        print(f"[auth] error starting password reset: {exc}")
+        return jsonify({"error": "Something went wrong. Please try again."}), 500
+
+    if user:
+        subject, text, html = mailer.reset_code_email(user["full_name"], code, accounts.RESET_CODE_MINUTES)
+        try:
+            mailer.send_email(user["email"], subject, text, html)
+        except mailer.EmailNotSent as exc:
+            print(f"[email] password reset email to user {user['id']} failed: {exc}")
+            return jsonify({"error": "We couldn't send the email right now. Please try again later."}), 502
+    return jsonify({
+        "ok": True,
+        "minutes": accounts.RESET_CODE_MINUTES,
+        "resend_after": accounts.RESET_RESEND_SECONDS,
+    })
+
+
+@auth_bp.route("/auth/password/verify", methods=["POST"])
+def verify_reset_code():
+    """Step 2: check the code. The right code gives a one-time reset token."""
+    data = request.get_json(silent=True) or {}
+    try:
+        token = accounts.verify_reset_code(data.get("email"), data.get("code"))
+    except accounts.AccountError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        print(f"[auth] error verifying reset code: {exc}")
+        return jsonify({"error": "Something went wrong. Please try again."}), 500
+    return jsonify({"reset_token": token})
+
+
+@auth_bp.route("/auth/password/reset", methods=["POST"])
+def reset_password():
+    """Step 3: set the new password (signs out every device)."""
+    data = request.get_json(silent=True) or {}
+    try:
+        accounts.finish_password_reset(data.get("email"), data.get("reset_token"), data.get("new_password"))
+    except accounts.AccountError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        print(f"[auth] error resetting password: {exc}")
+        return jsonify({"error": "Your password could not be changed. Please try again."}), 500
+    session.clear()
+    return jsonify({"ok": True})

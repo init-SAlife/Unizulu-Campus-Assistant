@@ -13,8 +13,10 @@ immediately and several users can be served at the same time without
 sharing one connection's transaction.
 """
 
+import hashlib
 import os
 import re
+import secrets
 import uuid
 from contextlib import contextmanager
 
@@ -77,9 +79,11 @@ def _cursor():
 
 # ------------------------------------------------------------------ schema
 EXPECTED_COLUMNS = {
-    "users": {"id", "email", "full_name", "password_hash", "created_at", "last_login_at"},
+    "users": {"id", "email", "full_name", "password_hash", "created_at", "last_login_at", "session_version"},
     "chat_sessions": {"id", "user_id", "title", "context", "created_at", "updated_at"},
     "chat_messages": {"id", "session_id", "role", "content", "created_at"},
+    "password_resets": {"id", "user_id", "code_hash", "attempts", "reset_token_hash",
+                        "created_at", "expires_at", "used_at"},
 }
 
 
@@ -124,10 +128,7 @@ def register_user(full_name, email, password):
         raise AccountError("That name is too long.")
     if not EMAIL_PATTERN.match(email) or len(email) > 254:
         raise AccountError("Please enter a valid email address.")
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise AccountError(f"Your password must be at least {MIN_PASSWORD_LENGTH} characters.")
-    if len(password) > 200:
-        raise AccountError("That password is too long.")
+    _check_new_password(password)
 
     try:
         with _cursor() as cur:
@@ -161,6 +162,154 @@ def get_user(user_id):
     with _cursor() as cur:
         cur.execute("SELECT id, email, full_name FROM users WHERE id = %s", (user_id,))
         return _user_dict(cur.fetchone())
+
+
+def get_session_user(user_id, session_version):
+    """The user for a sign-in cookie, or None if the cookie is out of date
+    (the password was changed after it was made, so it no longer counts)."""
+    with _cursor() as cur:
+        cur.execute("SELECT id, email, full_name, session_version FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+    if not row or row[3] != (session_version or 0):
+        return None
+    return _user_dict(row[:3])
+
+
+def get_session_version(user_id):
+    with _cursor() as cur:
+        cur.execute("SELECT session_version FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+    return row[0] if row else 0
+
+
+# ------------------------------------------------------------------ passwords
+RESET_CODE_MINUTES = 10        # an emailed code works for this long
+RESET_TOKEN_MINUTES = 15       # after the right code: time left to choose the new password
+RESET_MAX_ATTEMPTS = 5         # wrong guesses allowed per code
+RESET_RESEND_SECONDS = 60      # wait at least this long between two codes
+RESET_MAX_PER_HOUR = 5         # codes per account per hour
+
+
+def _check_new_password(password):
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise AccountError(f"Your password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    if len(password) > 200:
+        raise AccountError("That password is too long.")
+
+
+def _sha256(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _set_password(cur, user_id, new_password):
+    """Stores the new password and signs out every existing sign-in cookie.
+    Returns the new session version (to keep the current device signed in)."""
+    cur.execute("""UPDATE users SET password_hash = %s, session_version = session_version + 1
+                   WHERE id = %s RETURNING session_version""",
+                (generate_password_hash(new_password), user_id))
+    return cur.fetchone()[0]
+
+
+def change_password(user_id, current_password, new_password):
+    """Settings -> Change password. Returns the new session version."""
+    current_password = str(current_password or "")
+    new_password = str(new_password or "")
+    with _cursor() as cur:
+        cur.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        if not row or not check_password_hash(row[0], current_password):
+            raise AccountError("Your current password is not correct.")
+        _check_new_password(new_password)
+        if check_password_hash(row[0], new_password):
+            raise AccountError("Your new password must be different from your current one.")
+        return _set_password(cur, user_id, new_password)
+
+
+def start_password_reset(email):
+    """Makes a new 6-digit code for this email. Returns (user, code), or
+    (None, None) when no account has this email -- the caller answers the
+    same way in both cases, so the page never reveals which emails exist."""
+    email = _clean_email(email)
+    if not EMAIL_PATTERN.match(email):
+        raise AccountError("Please enter a valid email address.")
+    with _cursor() as cur:
+        cur.execute("SELECT id, email, full_name FROM users WHERE lower(email) = %s", (email,))
+        row = cur.fetchone()
+        if not row:
+            return None, None
+        user = _user_dict(row)
+
+        cur.execute("""SELECT count(*),
+                              coalesce(extract(epoch FROM now() - max(created_at)), 1e9)
+                       FROM password_resets
+                       WHERE user_id = %s AND created_at > now() - interval '1 hour'""", (user["id"],))
+        count, seconds_since_last = cur.fetchone()
+        if seconds_since_last < RESET_RESEND_SECONDS:
+            wait = int(RESET_RESEND_SECONDS - seconds_since_last) + 1
+            raise AccountError(f"Please wait {wait} seconds before asking for another code.")
+        if count >= RESET_MAX_PER_HOUR:
+            raise AccountError("Too many codes were requested. Please try again in an hour.")
+
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        # only the newest code works
+        cur.execute("UPDATE password_resets SET used_at = now() WHERE user_id = %s AND used_at IS NULL",
+                    (user["id"],))
+        cur.execute("""INSERT INTO password_resets (user_id, code_hash, expires_at)
+                       VALUES (%s, %s, now() + %s * interval '1 minute')""",
+                    (user["id"], generate_password_hash(code), RESET_CODE_MINUTES))
+        return user, code
+
+
+def verify_reset_code(email, code):
+    """Checks the emailed code. Returns a one-time reset token when it is right."""
+    email = _clean_email(email)
+    code = re.sub(r"\D", "", str(code or ""))
+    wrong = AccountError("That code is not correct. Please check the email and try again.")
+    if len(code) != 6:
+        raise AccountError("Please enter the 6-digit code from the email.")
+    with _cursor() as cur:
+        cur.execute("""SELECT r.id, r.code_hash, r.attempts, r.expires_at < now()
+                       FROM password_resets r JOIN users u ON u.id = r.user_id
+                       WHERE lower(u.email) = %s AND r.used_at IS NULL AND r.reset_token_hash IS NULL
+                       ORDER BY r.created_at DESC LIMIT 1""", (email,))
+        row = cur.fetchone()
+        if not row:
+            raise wrong
+        reset_id, code_hash, attempts, expired = row
+        if expired:
+            raise AccountError("This code has expired. Please ask for a new one.")
+        if attempts >= RESET_MAX_ATTEMPTS:
+            raise AccountError("Too many wrong tries. Please ask for a new code.")
+        if not check_password_hash(code_hash, code):
+            cur.execute("UPDATE password_resets SET attempts = attempts + 1 WHERE id = %s", (reset_id,))
+            left = RESET_MAX_ATTEMPTS - attempts - 1
+            if left <= 0:
+                raise AccountError("That code is not correct, and there are no tries left. Please ask for a new code.")
+            raise AccountError(f"That code is not correct. {left} {'try' if left == 1 else 'tries'} left.")
+        token = secrets.token_urlsafe(32)
+        cur.execute("""UPDATE password_resets
+                       SET reset_token_hash = %s, expires_at = now() + %s * interval '1 minute'
+                       WHERE id = %s""", (_sha256(token), RESET_TOKEN_MINUTES, reset_id))
+        return token
+
+
+def finish_password_reset(email, token, new_password):
+    """Sets the new password using the token from verify_reset_code."""
+    email = _clean_email(email)
+    new_password = str(new_password or "")
+    with _cursor() as cur:
+        cur.execute("""SELECT r.id, u.id, u.email, u.full_name
+                       FROM password_resets r JOIN users u ON u.id = r.user_id
+                       WHERE lower(u.email) = %s AND r.reset_token_hash = %s
+                         AND r.used_at IS NULL AND r.expires_at > now()""",
+                    (email, _sha256(str(token or ""))))
+        row = cur.fetchone()
+        if not row:
+            raise AccountError("This reset link has expired. Please start again and ask for a new code.")
+        _check_new_password(new_password)
+        _set_password(cur, row[1], new_password)
+        cur.execute("UPDATE password_resets SET used_at = now() WHERE id = %s", (row[0],))
+        return _user_dict(row[1:])
 
 
 # ------------------------------------------------------------------ chats

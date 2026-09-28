@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UNIZULU Campus AI Assistant</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" type="image/png" href="img/unizulu-logo.png">
+<script src="js/common.js"></script>
 </head>
 <body class="app-page">
 
@@ -19,14 +22,101 @@
       <span class="title">Campus AI Assistant</span>
     </div>
   </div>
-  <div class="header-right">
-    <div class="user-box">
-      <span class="user-initial" id="userInitial" aria-hidden="true"></span>
-      <span class="user-name" id="userName"></span>
-      <button type="button" id="logoutBtn" class="logout-btn">Log out</button>
-    </div>
-  </div>
+  <!-- profile button: shows the student's initial, opens the Account card -->
+  <button type="button" id="profileBtn" class="profile-btn" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Your account" title="Your account">
+    <span id="profileInitial" class="profile-initial" aria-hidden="true"></span>
+  </button>
 </header>
+
+<!-- ===================== ACCOUNT (profile) CARD =====================
+     Replaces the old "name + Log out" box. Opens from the profile button above. -->
+<div id="accountOverlay" class="acct-overlay" hidden>
+  <div id="accountPanel" class="acct-panel" role="dialog" aria-modal="true" aria-labelledby="acctTitle">
+
+    <!-- Header -->
+    <div class="acct-header">
+      <h2 id="acctTitle">Account</h2>
+      <button type="button" id="acctClose" class="acct-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Profile Section -->
+    <div class="acct-profile">
+      <div class="acct-avatar" id="acctAvatar" aria-hidden="true"></div>
+      <h1 class="acct-name" id="acctName"></h1>
+      <button type="button" id="updateProfileBtn" class="acct-update-btn">Update Profile</button>
+    </div>
+
+    <!-- Menu Options -->
+    <div class="acct-menu">
+      <button type="button" id="profileRow" class="acct-item" aria-expanded="false" aria-controls="profileDetails">
+        <span class="acct-icon"><i class="fa-regular fa-user"></i></span>
+        <span class="acct-text">Profile</span>
+        <i class="fa-solid fa-chevron-right acct-arrow"></i>
+      </button>
+      <!-- shown when "Profile" is tapped: the signed-in student's details -->
+      <dl id="profileDetails" class="acct-details" hidden>
+        <div><dt>Full name</dt><dd id="detailName"></dd></div>
+        <div id="detailEmailRow" hidden><dt>Email</dt><dd id="detailEmail"></dd></div>
+        <p class="acct-details-note">Editing your profile is not available yet.</p>
+      </dl>
+    </div>
+
+    <!-- Settings: theme and password -->
+    <p class="acct-section-label">Settings</p>
+    <div class="acct-menu">
+      <div class="acct-item acct-static">
+        <span class="acct-icon"><i class="fa-solid fa-circle-half-stroke"></i></span>
+        <span class="acct-text">Appearance</span>
+        <div class="theme-switch" role="radiogroup" aria-label="Appearance">
+          <button type="button" class="theme-opt" data-theme-choice="light" role="radio" aria-checked="true">
+            <i class="fa-solid fa-sun"></i> Light
+          </button>
+          <button type="button" class="theme-opt" data-theme-choice="dark" role="radio" aria-checked="false">
+            <i class="fa-solid fa-moon"></i> Dark
+          </button>
+          <span class="theme-thumb" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <button type="button" id="passwordRow" class="acct-item" aria-expanded="false" aria-controls="passwordPanel">
+        <span class="acct-icon"><i class="fa-solid fa-key"></i></span>
+        <span class="acct-text">Change password</span>
+        <i class="fa-solid fa-chevron-right acct-arrow"></i>
+      </button>
+      <div id="passwordPanel" class="acct-collapse" hidden>
+        <form id="changePasswordForm" class="acct-form" novalidate>
+          <div class="field">
+            <label for="currentPassword">Current password</label>
+            <input id="currentPassword" type="password" autocomplete="current-password" required>
+          </div>
+          <div class="field">
+            <label for="newPasswordSetting">New password</label>
+            <input id="newPasswordSetting" type="password" autocomplete="new-password" placeholder="At least 8 characters" required>
+          </div>
+          <div class="field">
+            <label for="confirmPasswordSetting">Confirm new password</label>
+            <input id="confirmPasswordSetting" type="password" autocomplete="new-password" required>
+          </div>
+          <p id="passwordError" class="auth-error" role="alert" hidden></p>
+          <p id="passwordSuccess" class="auth-notice" role="status" hidden></p>
+          <button type="submit" class="btn-verify">Update password</button>
+          <a class="acct-form-link" href="/forgot-password">Forgotten your current password?</a>
+        </form>
+      </div>
+    </div>
+
+    <!-- Sign Out Section (separated for emphasis) -->
+    <div class="acct-menu acct-signout-list">
+      <button type="button" id="signOutBtn" class="acct-item acct-signout">
+        <span class="acct-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></span>
+        <span class="acct-text">Sign out</span>
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <p class="acct-footer">Secured by <strong><i class="fa-solid fa-lock"></i> unizulu</strong></p>
+  </div>
+</div>
 
 <nav>
   <button class="tab-btn active" data-view="homeView">🏠 Home</button>
@@ -78,11 +168,14 @@
 
     <!-- chat list: every chat this user has had, newest first -->
     <aside id="chatSidebar" class="chat-sidebar" aria-label="Your chats">
-      <button type="button" id="newChatBtn" class="new-chat-btn">＋ New chat</button>
-      <div id="chatList" class="chat-list"></div>
-      <p id="chatListEmpty" class="chat-list-empty" hidden>Your chats will appear here.</p>
+      <!-- the inner box keeps its width while the sidebar slides open/closed -->
+      <div class="chat-sidebar-inner">
+        <button type="button" id="newChatBtn" class="new-chat-btn">＋ New chat</button>
+        <div id="chatList" class="chat-list"></div>
+        <p id="chatListEmpty" class="chat-list-empty" hidden>Your chats will appear here.</p>
+      </div>
     </aside>
-    <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
     <div class="chat-main">
       <div class="chat-head">
@@ -154,7 +247,10 @@
           <button type="button" id="stopRouteBtn" class="stop-route-btn" hidden>✕ End route</button>
         </div>
         <!-- Leaflet draws the campus map here -->
-        <div id="campusMap" role="region" aria-label="Campus map"></div>
+        <div class="map-wrap">
+          <div id="campusMap" role="region" aria-label="Campus map"></div>
+          <p id="zoomHint" class="zoom-hint" hidden>Zoom in to see buildings</p>
+        </div>
       </div>
 
       <div class="col-right">
@@ -162,7 +258,7 @@
           <div class="nav-info-icon">➹</div>
           <h3>Campus Navigator</h3>
           <p>Choose where you are starting from and your destination, then tap <strong style="color:var(--text)">Get Route</strong>. With <strong style="color:var(--text)">Current location</strong>, the route follows you and updates as you walk.</p>
-          <p class="hint">You can also tap any building on the map to get directions to it.</p>
+          <p class="hint">You can also tap any place on the map to see it and get directions to it.</p>
           <div id="routeResult"></div>
         </div>
       </div>
