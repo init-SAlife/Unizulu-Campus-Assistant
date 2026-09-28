@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNIZULU Campus AI Assistant</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/png" href="img/unizulu-logo.png">
+</head>
+<body class="app-page">
+
+<header>
+  <div class="brand">
+    <!-- UNIZULU logo: save it as static/img/unizulu-logo.png (hidden if the file is missing) -->
+    <img class="brand-logo" src="img/unizulu-logo.png" alt="University of Zululand logo" onerror="this.remove()">
+    <div class="brand-text">
+      <span class="eyebrow">UNIZULU</span>
+      <span class="title">Campus AI Assistant</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="user-box">
+      <span class="user-initial" id="userInitial" aria-hidden="true"></span>
+      <span class="user-name" id="userName"></span>
+      <button type="button" id="logoutBtn" class="logout-btn">Log out</button>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="tab-btn active" data-view="homeView">🏠 Home</button>
+  <button class="tab-btn" data-view="chatView">💬 AI Assistant</button>
+  <button class="tab-btn" data-view="navView">📍 Campus Navigator</button>
+</nav>
+
+<main>
+
+  <!-- ===================== HOME: choose what to use ===================== -->
+  <section id="homeView" class="view active">
+    <div class="home">
+      <h1 class="home-greeting">Sawubona<span id="homeName"></span>!</h1>
+      <p class="home-question">What would you like to use today?</p>
+
+      <div class="home-choices">
+        <article class="home-card">
+          <div class="home-card-icon" aria-hidden="true">💬</div>
+          <h2>AI Assistant</h2>
+          <p>Ask questions about your studies and get answers from the official FSAE handbooks.</p>
+          <ul>
+            <li>Programmes, modules, electives and credits needed to graduate</li>
+            <li>Module prerequisites and admission requirements</li>
+            <li>Check your proof of registration against your programme</li>
+            <li>Upload your academic record to see what you have passed and what is still outstanding</li>
+            <li>Your chats are saved, so you can continue any chat later</li>
+          </ul>
+          <button type="button" class="home-btn" data-go="chatView">Use the AI Assistant</button>
+        </article>
+
+        <article class="home-card">
+          <div class="home-card-icon" aria-hidden="true">📍</div>
+          <h2>Campus Navigator</h2>
+          <p>Find your way around the KwaDlangezwa campus.</p>
+          <ul>
+            <li>Find lecture venues, faculties, the library and student offices</li>
+            <li>Start from your current location or from another building</li>
+            <li>See the campus on the map and get a route to where you are going</li>
+          </ul>
+          <p class="home-note">Directions are for walking. The route updates as you walk.</p>
+          <button type="button" class="home-btn" data-go="navView">Use the Campus Navigator</button>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== AI ASSISTANT VIEW ===================== -->
+  <section id="chatView" class="view">
+
+    <!-- chat list: every chat this user has had, newest first -->
+    <aside id="chatSidebar" class="chat-sidebar" aria-label="Your chats">
+      <button type="button" id="newChatBtn" class="new-chat-btn">＋ New chat</button>
+      <div id="chatList" class="chat-list"></div>
+      <p id="chatListEmpty" class="chat-list-empty" hidden>Your chats will appear here.</p>
+    </aside>
+    <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
+
+    <div class="chat-main">
+      <div class="chat-head">
+        <button type="button" id="sidebarToggle" class="sidebar-toggle" aria-controls="chatSidebar" aria-expanded="true" aria-label="Hide your chats" title="Hide chats">☰</button>
+        <h1 id="chatTitle" class="chat-title">New chat</h1>
+        <span id="handbookChip" class="handbook-chip" hidden></span>
+      </div>
+      <div class="accuracy-note">for more accurate responses please use module/programme codes if possible</div>
+
+      <div id="chatMessages"></div>
+
+      <template id="welcomeTemplate">
+        <div class="msg-row bot welcome">
+          <div class="bubble">
+            <p class="greet">Sawubona<span class="welcome-name"></span>! I am your UNIZULU Campus AI Assistant.</p>
+            <p>I can help with:</p>
+            <ul>
+              <li>Module selection and credit requirements</li>
+              <li>Registration rules and prerequisites</li>
+              <li>Campus venue directions</li>
+            </ul>
+            <p>Type your question, tap the mic to speak, or attach your academic record or proof of registration.</p>
+          </div>
+        </div>
+      </template>
+
+    <div id="attachmentPreview" class="attachment-preview"></div>
+    <div class="chat-input-bar">
+      <input id="fileInput" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple hidden>
+      <select id="documentType" class="document-type" aria-label="Document type">
+        <option value="academic_record">Academic record</option>
+        <option value="proof_of_registration">Proof of registration</option>
+      </select>
+      <button id="uploadBtn" class="icon-btn" type="button" title="Attach academic record or proof of registration" aria-label="Attach document">⬆</button>
+      <input id="chatInput" type="text" placeholder="Ask a question, upload a file, or speak...">
+      <button id="micBtn" class="icon-btn" type="button" title="Speak" aria-label="Speak">🎤</button>
+      <button class="send-btn" onclick="sendChat()" aria-label="Send">➤</button>
+    </div>
+    </div>
+  </section>
+
+  <!-- ===================== CAMPUS NAVIGATOR VIEW ===================== -->
+  <section id="navView" class="view">
+
+    <div class="nav-toolbar">
+      <div class="select-pill from">
+        <span class="dot"></span>
+        <span class="pill-label">From</span>
+        <!-- the buildings are added by navigation.js from buildings.json -->
+        <select id="fromSelect" aria-label="Starting point">
+          <option value="current">Current location</option>
+        </select>
+      </div>
+      <div class="select-pill to">
+        <span class="dot"></span>
+        <span class="pill-label">To</span>
+        <!-- the buildings are added by navigation.js from buildings.json -->
+        <select id="toSelect" aria-label="Destination">
+          <option value="">Select destination...</option>
+        </select>
+      </div>
+      <button class="btn-route" onclick="getRoute()">➹ Get Route</button>
+    </div>
+
+    <div class="nav-grid">
+      <div class="map-card card">
+        <div class="map-card-head">
+          <span class="loc">📍 UNIZULU Campus</span>
+          <button type="button" id="stopRouteBtn" class="stop-route-btn" hidden>✕ End route</button>
+        </div>
+        <!-- Leaflet draws the campus map here -->
+        <div id="campusMap" role="region" aria-label="Campus map"></div>
+      </div>
+
+      <div class="col-right">
+        <div class="card nav-info-card">
+          <div class="nav-info-icon">➹</div>
+          <h3>Campus Navigator</h3>
+          <p>Choose where you are starting from and your destination, then tap <strong style="color:var(--text)">Get Route</strong>. With <strong style="color:var(--text)">Current location</strong>, the route follows you and updates as you walk.</p>
+          <p class="hint">You can also tap any building on the map to get directions to it.</p>
+          <div id="routeResult"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>University of Zululand · KwaDlangezwa 3886 · Campus AI Assistant v3.0</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- shared start-up first, then the two parts: each part's logic is in its own file -->
+<script src="js/app.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/navigation.js"></script>
+</body>
+</html>

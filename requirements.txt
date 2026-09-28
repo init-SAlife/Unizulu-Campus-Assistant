@@ -1,0 +1,11 @@
+# Install everything with:  pip install -r requirements.txt
+flask
+python-dotenv
+psycopg2-binary
+anthropic
+networkx          # Campus Navigator: walking routes (campus_graph.py)
+pdfplumber        # backup reader for uploaded PDFs
+pytesseract       # backup reader for images (also needs the Tesseract program installed)
+Pillow
+PyMuPDF           # turns scanned PDF pages into images for the backup reader
+gunicorn          # production web server (used on Render)

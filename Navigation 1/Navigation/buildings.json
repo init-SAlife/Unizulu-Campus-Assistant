@@ -1,0 +1,268 @@
+{
+  "buildings": [
+    {
+      "id": "14210600968",
+      "name": "Admin",
+      "description": "Unizulu information",
+      "category": "building",
+      "lat": -28.8541911,
+      "lng": 31.8477147
+    },
+    {
+      "id": "14210600977",
+      "name": "Agriculture",
+      "description": "Department of Agriculture",
+      "category": "building",
+      "lat": -28.851411,
+      "lng": 31.8519606
+    },
+    {
+      "id": "14210600966",
+      "name": "AL's",
+      "description": "Lecture vanue 2",
+      "category": "building",
+      "lat": -28.8537434,
+      "lng": 31.8504601
+    },
+    {
+      "id": "14210600960",
+      "name": "Art building",
+      "description": "Department of arts",
+      "category": "building",
+      "lat": -28.8550504,
+      "lng": 31.8479703
+    },
+    {
+      "id": "14210600963",
+      "name": "chapel",
+      "description": "Chapel hall",
+      "category": "building",
+      "lat": -28.8523137,
+      "lng": 31.8483248
+    },
+    {
+      "id": "14210600984",
+      "name": "Clinic",
+      "description": "Clinic area",
+      "category": "building",
+      "lat": -28.8553002,
+      "lng": 31.8464771
+    },
+    {
+      "id": "14210600956",
+      "name": "D block",
+      "description": "law building",
+      "category": "building",
+      "lat": -28.8520682,
+      "lng": 31.8518782
+    },
+    {
+      "id": "14055010331",
+      "name": "East Entrance",
+      "description": "",
+      "category": "gate",
+      "lat": -28.8512316,
+      "lng": 31.8514669
+    },
+    {
+      "id": "14210600978",
+      "name": "east res",
+      "description": "east",
+      "category": "building",
+      "lat": -28.8494902,
+      "lng": 31.8529994
+    },
+    {
+      "id": "14055010330",
+      "name": "Emhlathuze Entrance",
+      "description": "",
+      "category": "gate",
+      "lat": -28.8470778,
+      "lng": 31.8527445
+    },
+    {
+      "id": "14055010328",
+      "name": "Highfield Entrance",
+      "description": "",
+      "category": "gate",
+      "lat": -28.853638,
+      "lng": 31.8432767
+    },
+    {
+      "id": "14210600972",
+      "name": "highveld",
+      "description": "football ground",
+      "category": "building",
+      "lat": -28.853238,
+      "lng": 31.8444747
+    },
+    {
+      "id": "14210600973",
+      "name": "Human movement science",
+      "description": "Department of mov sc",
+      "category": "building",
+      "lat": -28.8551226,
+      "lng": 31.8438728
+    },
+    {
+      "id": "14055010332",
+      "name": "King Bhekuzulu Hall",
+      "description": "",
+      "category": "building",
+      "lat": -28.8547392,
+      "lng": 31.8467076
+    },
+    {
+      "id": "262708148",
+      "name": "KwaDlangezwa",
+      "description": "",
+      "category": "transport",
+      "lat": -28.8544444,
+      "lng": 31.8458333
+    },
+    {
+      "id": "14210600954",
+      "name": "Library",
+      "description": "24 hour space",
+      "category": "building",
+      "lat": -28.8530719,
+      "lng": 31.850254
+    },
+    {
+      "id": "14210600974",
+      "name": "Madiba",
+      "description": "Madiba res",
+      "category": "building",
+      "lat": -28.8510355,
+      "lng": 31.8465523
+    },
+    {
+      "id": "14055010324",
+      "name": "Main gate",
+      "description": "",
+      "category": "gate",
+      "lat": -28.8570889,
+      "lng": 31.8432586
+    },
+    {
+      "id": "14210600980",
+      "name": "middle east",
+      "description": "middle east residence",
+      "category": "building",
+      "lat": -28.8499524,
+      "lng": 31.8514742
+    },
+    {
+      "id": "14210600958",
+      "name": "NE's",
+      "description": "Lecture venue 4",
+      "category": "building",
+      "lat": -28.8538012,
+      "lng": 31.8500809
+    },
+    {
+      "id": "14210600967",
+      "name": "Nursing dep",
+      "description": "Nursing department",
+      "category": "building",
+      "lat": -28.8537017,
+      "lng": 31.8491285
+    },
+    {
+      "id": "14210600957",
+      "name": "Physics lab",
+      "description": "lab for physics",
+      "category": "building",
+      "lat": -28.8521476,
+      "lng": 31.8512104
+    },
+    {
+      "id": "14210600965",
+      "name": "Physics Lab",
+      "description": "Lab",
+      "category": "building",
+      "lat": -28.8517721,
+      "lng": 31.8517793
+    },
+    {
+      "id": "14210600970",
+      "name": "post office",
+      "description": "post office of unizulu",
+      "category": "building",
+      "lat": -28.856509,
+      "lng": 31.8437079
+    },
+    {
+      "id": "14210600982",
+      "name": "Psd",
+      "description": "Psd office",
+      "category": "building",
+      "lat": -28.8552099,
+      "lng": 31.8466413
+    },
+    {
+      "id": "14210600971",
+      "name": "rugby field",
+      "description": "Rugby ground",
+      "category": "building",
+      "lat": -28.8526531,
+      "lng": 31.8461483
+    },
+    {
+      "id": "14210600955",
+      "name": "SC's",
+      "description": "lecture vanue",
+      "category": "building",
+      "lat": -28.852978,
+      "lng": 31.8512186
+    },
+    {
+      "id": "14210600979",
+      "name": "siqalo res",
+      "description": "siqalo",
+      "category": "building",
+      "lat": -28.8492014,
+      "lng": 31.8548792
+    },
+    {
+      "id": "14210600964",
+      "name": "unizulu building",
+      "description": "lost building",
+      "category": "building",
+      "lat": -28.8522054,
+      "lng": 31.8497594
+    },
+    {
+      "id": "14210600961",
+      "name": "Unizulu building 2",
+      "description": "Building near bank",
+      "category": "building",
+      "lat": -28.8548266,
+      "lng": 31.8475499
+    },
+    {
+      "id": "14210600959",
+      "name": "west res",
+      "description": "west",
+      "category": "building",
+      "lat": -28.8519093,
+      "lng": 31.8475581
+    },
+    {
+      "id": "14210600976",
+      "name": "west res 2",
+      "description": "west res",
+      "category": "building",
+      "lat": -28.8507034,
+      "lng": 31.8476983
+    },
+    {
+      "id": "14210600975",
+      "name": "west shop1",
+      "description": "west shop",
+      "category": "building",
+      "lat": -28.8514688,
+      "lng": 31.8475169
+    }
+  ]
+}

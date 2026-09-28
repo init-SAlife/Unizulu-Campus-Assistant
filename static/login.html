@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in · UNIZULU Campus AI Assistant</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" type="image/png" href="img/unizulu-logo.png">
+</head>
+<body class="auth-page">
+
+<main class="auth-wrap">
+  <div class="auth-brand">
+    <!-- UNIZULU logo: save it as static/img/unizulu-logo.png (hidden if the file is missing) -->
+    <img class="auth-logo" src="img/unizulu-logo.png" alt="University of Zululand logo" onerror="this.remove()">
+    <h1 class="auth-title">UNIZULU Campus AI Assistant</h1>
+    <p class="auth-subtitle">University of Zululand</p>
+  </div>
+
+  <section class="card auth-card">
+    <div class="auth-tabs" role="tablist">
+      <button type="button" class="auth-tab active" data-mode="login" role="tab" aria-selected="true">Sign in</button>
+      <button type="button" class="auth-tab" data-mode="register" role="tab" aria-selected="false">Create account</button>
+    </div>
+
+    <!-- method="post" + the inline handler: if js/login.js ever fails to load, the form
+         does nothing instead of putting the email and password in the address bar -->
+    <form id="authForm" method="post" onsubmit="event.preventDefault()" novalidate>
+      <div class="field register-only" hidden>
+        <label for="fullName">Full name</label>
+        <input id="fullName" name="full_name" type="text" autocomplete="name" placeholder="e.g. Thandiwe Zulu">
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Your password" required>
+        <p class="field-hint register-only" hidden>At least 8 characters.</p>
+      </div>
+
+      <p id="authError" class="auth-error" role="alert" hidden></p>
+
+      <button id="authSubmit" type="submit" class="btn-verify">Sign in</button>
+    </form>
+
+    <p class="auth-switch">
+      <span id="switchText">New here?</span>
+      <button type="button" id="switchMode" class="link-btn">Create an account</button>
+    </p>
+  </section>
+
+  <p class="auth-note">Your chats are private to your account. You can come back to any chat and continue where you left off.</p>
+</main>
+
+<script src="js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# ---- secrets: NEVER upload these ----
+.env
+**/.env
+
+# ---- personal student documents (records, proof of registration) ----
+documents/
+files/
+
+# ---- local-only stuff ----
+campus_env/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.vscode/
+conversation_memory.json
+Navigation 1.zip
+*.dump
+*.sql.backup
+campus_backup.sql
