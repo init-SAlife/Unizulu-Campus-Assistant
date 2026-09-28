@@ -90,6 +90,7 @@ class _ReconnectingConnection:
     def __init__(self, config):
         self._config = config
         self._conn = None
+        self._pid = None
         self._last_check = 0.0
 
     def _open(self):
@@ -98,9 +99,15 @@ class _ReconnectingConnection:
             keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3,
         )
         self._conn.autocommit = True
+        self._pid = os.getpid()
         self._last_check = time.monotonic()
 
     def _live(self):
+        if self._pid != os.getpid():
+            # we are in a new gunicorn worker (a copy of the process that
+            # opened the connection): never share it -- over SSL that corrupts
+            # it. Leave the parent's connection alone and open our own.
+            self._conn = None
         if self._conn is None or self._conn.closed:
             self._open()
         elif time.monotonic() - self._last_check > self.CHECK_EVERY_S:
@@ -128,7 +135,7 @@ class _ReconnectingConnection:
         pass  # always on (see the class description)
 
     def close(self):
-        if self._conn is not None and not self._conn.closed:
+        if self._conn is not None and not self._conn.closed and self._pid == os.getpid():
             self._conn.close()
 
 

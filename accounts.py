@@ -31,6 +31,8 @@ MAX_TITLE_LENGTH = 80
 SCHEMA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "accounts_schema.sql")
 
 _pool = None
+_pool_pid = None       # the process that made the pool (see _get_pool)
+_pool_settings = None
 
 
 class AccountError(ValueError):
@@ -38,13 +40,31 @@ class AccountError(ValueError):
 
 
 def init_pool(db_config, minconn=1, maxconn=10):
-    global _pool
-    if _pool is None:
+    global _pool_settings
+    _pool_settings = (minconn, maxconn, dict(db_config))
+    return _get_pool()
+
+
+def _get_pool():
+    """The connection pool for THIS process.
+
+    gunicorn starts the app once and then copies it into each worker
+    process. A database connection must never be shared by two processes:
+    over SSL (Render) that corrupts it ("SSL error: decryption failed or bad
+    record mac", "SSL SYSCALL error: EOF detected"). So each worker makes its
+    own pool the first time it needs one. The parent's connections are left
+    alone (closing them here would break them for the parent too)."""
+    global _pool, _pool_pid
+    if _pool is None or _pool_pid != os.getpid():
+        if _pool_settings is None:
+            raise RuntimeError("accounts.init_pool() must be called first")
+        minconn, maxconn, db_config = _pool_settings
         # keepalives: notice quickly when a hosted database drops an idle connection
         _pool = ThreadedConnectionPool(
             minconn, maxconn, **db_config,
             keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3,
         )
+        _pool_pid = os.getpid()
     return _pool
 
 
@@ -52,12 +72,11 @@ def init_pool(db_config, minconn=1, maxconn=10):
 def _cursor():
     """A cursor on a pooled connection: commits on success, rolls back on
     any error, and always returns the connection to the pool."""
-    if _pool is None:
-        raise RuntimeError("accounts.init_pool() must be called first")
-    conn = _pool.getconn()
+    pool = _get_pool()
+    conn = pool.getconn()
     if conn.closed:                      # the database dropped it: throw it away, take a fresh one
-        _pool.putconn(conn, close=True)
-        conn = _pool.getconn()
+        pool.putconn(conn, close=True)
+        conn = pool.getconn()
     broken = False
     try:
         cur = conn.cursor()
@@ -74,7 +93,7 @@ def _cursor():
             if not cur.closed and not conn.closed:
                 cur.close()
     finally:
-        _pool.putconn(conn, close=broken or bool(conn.closed))
+        pool.putconn(conn, close=broken or bool(conn.closed))
 
 
 # ------------------------------------------------------------------ schema
