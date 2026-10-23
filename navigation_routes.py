@@ -1,14 +1,3 @@
-"""
-Campus Navigator web routes: walking routes on the KwaDlangezwa campus.
-The navigator's logic lives in campus_graph.py, which builds the footpath
-network from the campus OpenStreetMap export (map.osm) and reads the
-destination list from buildings.json. Both are loaded once at start-up.
-
-Web routes (open to everyone, including guests -- campus directions are public information):
-    GET  /api/campus   campus bounds, the building list and the main gate
-    POST /api/route    a walking route to a building
-"""
-
 import networkx as nx
 from flask import Blueprint, jsonify, request
 
@@ -19,7 +8,7 @@ navigation_bp = Blueprint("navigation", __name__)
 # a student further than this from every campus path is treated as "not on campus"
 OFF_CAMPUS_M = 300
 
-# ---------------------------------------------------------------- start-up
+# start-up
 CAMPUS = Campus()             # reads the .osm file next to campus_graph.py
 BUILDINGS = load_buildings()  # reads buildings.json
 
@@ -37,7 +26,7 @@ for problem in CAMPUS.check_buildings(BUILDINGS, HOME["id"]):
     print("[navigator] WARNING:", problem)
 
 
-# ---------------------------------------------------------------- routes
+# routes
 @navigation_bp.route("/api/campus", methods=["GET"])
 def api_campus():
     """Everything the map needs to start: campus bounds + the building list."""
@@ -64,7 +53,7 @@ def api_route():
     if not data:
         return jsonify({"error": "No JSON data received."}), 400
 
-    # ---- destination ----
+    #  destination
     try:
         if data.get("destination_id") is not None:
             dest = BUILDINGS.get(str(data["destination_id"]))
@@ -78,7 +67,7 @@ def api_route():
     except (KeyError, TypeError, ValueError):
         return jsonify({"error": "Invalid destination."}), 400
 
-    # ---- start ----
+    #  start 
     start_name = "your location"
     off_campus = False
     if data.get("start_id") is not None:
@@ -101,7 +90,7 @@ def api_route():
             start = (HOME["lat"], HOME["lng"])
             start_name = HOME["name"]
 
-    # ---- route ----
+    #  route 
     try:
         result = CAMPUS.route(start, end)
     except nx.NetworkXNoPath:

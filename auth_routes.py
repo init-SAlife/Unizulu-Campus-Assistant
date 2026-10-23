@@ -1,19 +1,3 @@
-"""
-Sign-in: creating accounts, signing in and out, and the login_required
-check that every chatbot and navigator route uses.
-
-Web routes (all JSON):
-    POST /auth/register   {full_name, email, password}
-    POST /auth/login      {email, password}
-    POST /auth/logout
-    GET  /auth/me         the signed-in user (or, for a guest, user null + guest allowance)
-
-    POST /auth/password/change   {current_password, new_password}   (signed in)
-    POST /auth/password/forgot   {email}                  emails a 6-digit code
-    POST /auth/password/verify   {email, code}            -> {reset_token}
-    POST /auth/password/reset    {email, reset_token, new_password}
-"""
-
 from functools import wraps
 
 from flask import Blueprint, g, jsonify, request, session
@@ -99,7 +83,7 @@ def me():
     return jsonify({"user": None, "guest": guest.status()})
 
 
-# ---------------------------------------------------------------- passwords
+#passwords
 @auth_bp.route("/auth/password/change", methods=["POST"])
 @login_required
 def change_password():

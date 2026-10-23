@@ -1,21 +1,3 @@
-"""
-Load modules.csv and programme_modules.csv into Postgres
--------------------------------------------------------------
-Creates (if needed) and populates two tables:
-    modules             -- what a module IS (shared across programmes)
-    programme_modules   -- how a specific programme uses a module
-                            (year/semester placement is on `modules`;
-                             elective grouping is here)
-
-No embeddings involved -- these are structured, exact-lookup tables,
-not RAG/semantic search data.
-
-BEFORE RUNNING:
-  pip install psycopg2-binary python-dotenv
-  Fill in DB_CONFIG below, or set DB_NAME/DB_USER/DB_PASSWORD/DB_HOST/DB_PORT
-  in your .env file (same folder as this script).
-"""
-
 import csv
 import os
 import psycopg2

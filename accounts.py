@@ -1,18 +1,3 @@
-"""
-Accounts and chats: registered users, their chat sessions, and every
-message in those chats, all stored in PostgreSQL.
-
-Each chat keeps its own memory (the chatbot "context": chosen handbook,
-last programme/module, uploaded documents, pending suggestion, recent
-history) in chat_sessions.context, so chats never share state -- neither
-between users nor between two chats of the same user.
-
-This module uses its OWN small connection pool, separate from the single
-read-only connection in Chatbot.py. Account and chat writes commit
-immediately and several users can be served at the same time without
-sharing one connection's transaction.
-"""
-
 import hashlib
 import os
 import re
@@ -95,8 +80,7 @@ def _cursor():
     finally:
         pool.putconn(conn, close=broken or bool(conn.closed))
 
-
-# ------------------------------------------------------------------ schema
+#SCHEMA
 EXPECTED_COLUMNS = {
     "users": {"id", "email", "full_name", "password_hash", "created_at", "last_login_at", "session_version"},
     "chat_sessions": {"id", "user_id", "title", "context", "created_at", "updated_at"},
@@ -129,7 +113,7 @@ def ensure_schema():
                 )
 
 
-# ------------------------------------------------------------------ users
+#USERS
 def _user_dict(row):
     return {"id": row[0], "email": row[1], "full_name": row[2]} if row else None
 
@@ -203,7 +187,7 @@ def get_session_version(user_id):
     return row[0] if row else 0
 
 
-# ------------------------------------------------------------------ passwords
+#passwords
 RESET_CODE_MINUTES = 10        # an emailed code works for this long
 RESET_TOKEN_MINUTES = 15       # after the right code: time left to choose the new password
 RESET_MAX_ATTEMPTS = 5         # wrong guesses allowed per code
@@ -333,7 +317,7 @@ def finish_password_reset(email, token, new_password):
         return _user_dict(row[1:])
 
 
-# ------------------------------------------------------------------ chats
+#chats
 def _valid_chat_id(chat_id):
     try:
         return str(uuid.UUID(str(chat_id)))
@@ -439,7 +423,7 @@ def delete_chat(user_id, chat_id):
         return cur.rowcount == 1
 
 
-# ------------------------------------------------------------------ guests
+#guests
 # Visitors who are not signed in can use the Campus Navigator freely and ask
 # the AI Assistant a few questions (limits are in chatbot_routes.py). A
 # guest chat's memory lives in guest_chats for a day; guest_questions only

@@ -1,19 +1,3 @@
-"""
-AI Assistant (chatbot) web routes. The chatbot's logic lives in Chatbot.py;
-each user's chats and their memory are stored through accounts.py.
-
-Web routes (all need a signed-in user, except /chat, which guests can use a
-few times a day -- see guest.py):
-    POST   /chat                  ask a question in a chat (a new chat is created if no chat_id)
-    POST   /upload                upload an academic record / proof of registration into a chat
-    GET    /chats                 the user's chats, newest first
-    GET    /chats/<id>            one chat with all its messages
-    PATCH  /chats/<id>            rename a chat
-    DELETE /chats/<id>            delete a chat
-    GET    /handbooks             the handbook editions (and the one a chat uses)
-    POST   /registration-check    check module codes directly against a programme
-"""
-
 import os
 import tempfile
 
@@ -33,7 +17,7 @@ ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg"}
 # first few messages; if it's still only small talk by then, it's named anyway
 TITLE_FORCE_AFTER_MESSAGES = 3
 
-# ---------------------------------------------------------------- start-up
+#start-up
 # Chatbot.py only READS handbook data on its connection; autocommit means
 # every read is its own transaction, so one failed query can't leave the
 # shared connection stuck for everyone else.
@@ -47,7 +31,7 @@ Chatbot.PERSIST_TO_FILE = False
 known_codes = Chatbot.get_programme_names()
 
 
-# ---------------------------------------------------------------- helpers
+#helpers
 def load_chat(chat_id):
     """The signed-in user's chat with its memory, or a brand-new unsaved
     chat when no chat_id is given. A new chat is only written to the
@@ -92,7 +76,7 @@ def chat_payload(chat):
     return {"chat_id": chat["id"], "title": chat["title"], "handbook": handbook_of(chat["context"])}
 
 
-# ---------------------------------------------------------------- chats
+#chats
 @chatbot_bp.route("/chats", methods=["GET"])
 @login_required
 def chats_list():
@@ -130,7 +114,7 @@ def chats_delete(chat_id):
     return jsonify({"deleted": chat_id})
 
 
-# ---------------------------------------------------------------- chatbot
+#chatbot
 @chatbot_bp.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}

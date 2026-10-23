@@ -1,27 +1,3 @@
-"""
-Sending emails (the "Forgotten password?" codes).
-
-Two ways to send, chosen by what is set in .env / Render's Environment:
-
-  1. Brevo (recommended on Render -- it sends over HTTPS, which Render's free
-     plan allows; Render's free plan BLOCKS normal SMTP email ports):
-         BREVO_API_KEY    your Brevo API key
-         MAIL_FROM        the sender email you verified in Brevo
-
-  2. SMTP, e.g. Gmail with an app password (works on your own PC and on
-     paid Render plans, NOT on Render's free plan):
-         SMTP_HOST        smtp.gmail.com
-         SMTP_PORT        587
-         SMTP_USER        you@gmail.com
-         SMTP_PASSWORD    the 16-letter Gmail app password
-         MAIL_FROM        you@gmail.com   (optional, defaults to SMTP_USER)
-
-  Optional:  MAIL_FROM_NAME  (default "UNIZULU Campus AI Assistant")
-
-If neither is set and the app is running on your own PC, the email is not
-sent -- it is printed in the terminal instead, so you can still test.
-"""
-
 import json
 import os
 import smtplib

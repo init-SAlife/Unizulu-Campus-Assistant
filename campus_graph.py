@@ -40,10 +40,7 @@ NOT_WALKABLE = {
 GATE_BARRIERS = {"entrance", "gate", "lift_gate"}
 
 
-# --------------------------------------------------
 # OSM PARSING
-# --------------------------------------------------
-
 def haversine(lat1, lng1, lat2, lng2):
     """Distance between two lat/lng points in metres."""
     r = 6371000
@@ -81,10 +78,7 @@ def parse_osm(path):
     return {"nodes": nodes, "node_tags": node_tags, "ways": ways, "bounds": bounds}
 
 
-# --------------------------------------------------
 # STABLE BUILDING LIST
-# --------------------------------------------------
-
 def extract_buildings(osm):
     """
     Your hand-placed, named OSM points become the building list:
@@ -122,9 +116,7 @@ def load_buildings(path=BUILDINGS_FILE):
     return {str(b["id"]): b for b in data["buildings"]}
 
 
-# --------------------------------------------------
 # GRAPH + SNAPPING + ROUTING
-# --------------------------------------------------
 
 @dataclass
 class Snap:
@@ -171,7 +163,7 @@ class Campus:
             x2, y2 = self._xy(self.G.nodes[v]["lat"], self.G.nodes[v]["lng"])
             self._segments.append((u, v, x1, y1, x2, y2))
 
-    # ---- build ----
+    #build 
     @staticmethod
     def _build_graph(osm):
         """
@@ -230,7 +222,7 @@ class Campus:
         qlat, qlng = self._latlng(qx, qy)
         return Snap(u, v, t, qlat, qlng, math.sqrt(d2))
 
-    # ---- routing ----
+    #routing
     def _attach(self, H, name, s):
         seg_len = self.G[s.u][s.v]["distance"]
         H.add_node(name, lat=s.lat, lng=s.lng)
@@ -267,7 +259,7 @@ class Campus:
             "end_offset_m": round(e.offset_m, 1),
         }
 
-    # ---- sanity checks (printed when the server starts) ----
+    # sanity checks (printed when the server starts)
     def check_buildings(self, buildings, home_id=None):
         problems = []
         home = buildings.get(home_id) if home_id else None
@@ -283,9 +275,7 @@ class Campus:
         return problems
 
 
-# --------------------------------------------------
 # CLI: write buildings.json
-# --------------------------------------------------
 
 if __name__ == "__main__":
     if BUILDINGS_FILE.exists() and "--force" not in sys.argv:

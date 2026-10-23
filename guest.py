@@ -1,27 +1,3 @@
-"""
-Guest mode: using the app without an account.
-
-Open to everyone:   Home, the Campus Navigator, and a few AI Assistant questions.
-Needs an account:   saved chats, uploading an academic record / proof of
-                    registration, the registration check, and more questions.
-
-Why the AI Assistant is limited for guests: every answer is a paid Claude
-API call, so an open, unlimited chatbot could be used up by anyone (or any
-script) that finds the link. Three limits protect it; all can be changed in
-.env / Render's Environment without touching the code:
-
-    GUEST_QUESTIONS_PER_DAY        questions one browser can ask per day        (default 10)
-    GUEST_QUESTIONS_PER_IP_HOUR    questions from one network per hour          (default 40)
-                                   -- high on purpose: everyone on campus Wi-Fi
-                                      can share one network address
-    GUEST_QUESTIONS_PER_HOUR       questions from ALL guests together per hour  (default 200)
-
-The per-browser count is kept in the signed session cookie (the guest can't
-change it). Clearing cookies resets it, which is why the per-network and
-all-guests limits exist too; those are counted in the database so they
-work across every server worker.
-"""
-
 import os
 from datetime import date
 

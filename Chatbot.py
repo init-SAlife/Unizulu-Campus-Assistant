@@ -2453,7 +2453,7 @@ def summarize_module_eligibility(r):
             f"{c}: {STATUS_WORDS[st] if r['record_available'] else 'unknown (no record)'}"
             + (", registered now" if now else "") for c, st, now in r["corequisites"]))
 
-    # verdict -- computed here, never left to Claude
+    # verdict computed here, never left to Claude
     missing = [p for p, st in r["prerequisites"] if st != "passed"]
     verdict = []
     if r["own_status"] == "passed":
@@ -2825,7 +2825,7 @@ def answer_question(question, known_codes, context=None):
 
     if meta.get("programme_code"):
         # e.g. a registration check learns the programme from the uploaded
-        # document -- follow-ups ("what are its electives?") should use it
+        # document follow-ups ("what are its electives?") should use it
         context["last_programme_code"] = meta["programme_code"]
 
     if meta.get("data_answer"):
