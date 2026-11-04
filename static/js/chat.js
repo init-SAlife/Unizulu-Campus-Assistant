@@ -1,10 +1,6 @@
-// =====================================================================
-// chat.js -- AI Assistant: the chat list, messages, uploads and the mic.
-// Talks to chatbot_routes.py (/chat, /upload, /chats ...).
-// Uses api(), currentUser and currentView from app.js.
-// =====================================================================
+// AI Assistant: the chat list, messages, uploads and the mic.
 
-// ---------- Chat list (each chat has its own memory, stored in the database) ----------
+// Chat list (each chat has its own memory, stored in the database)
 let currentChatId = null;
 let chats = [];
 // bumped whenever a different chat is shown, so an answer that arrives
@@ -185,7 +181,13 @@ async function openChat(chatId){
   const wrap = document.getElementById('chatMessages');
   wrap.innerHTML = '';
   if(!data.messages.length) showWelcome();
-  data.messages.forEach(m => appendMessage(m.content, m.role === 'user' ? 'user' : 'bot', false));
+  let lastQuestion = null;
+  data.messages.forEach(m => {
+    const who = m.role === 'user' ? 'user' : 'bot';
+    const row = appendMessage(m.content, who, false);
+    if(who === 'user') lastQuestion = m.content.startsWith('📎') ? null : m.content;
+    else{ addAnswerActions(row, m.content, lastQuestion); lastQuestion = null; }
+  });
   const last = wrap.lastElementChild;
   if(last) last.scrollIntoView({block: 'end'});
   renderChatList();
@@ -218,10 +220,9 @@ function afterReply(data, sentFromToken){
 
 document.getElementById('newChatBtn').addEventListener('click', newChat);
 
-// ---------- Chat list open / close ----------
-// Wide screens: the ☰ button shows or hides the chat list beside the chat
-// (the choice is remembered on this browser). Small screens: the chat list
-// slides in over the conversation and closes again after picking a chat.
+// Chat list open / close
+// Wide screens: the ☰ button shows or hides the chat list beside the chat (the choice is
+// remembered on this browser).
 const smallScreen = window.matchMedia('(max-width: 900px)');
 const SIDEBAR_KEY = 'campusAI.sidebarHidden';
 
@@ -270,7 +271,7 @@ document.getElementById('sidebarBackdrop').addEventListener('click', closeDrawer
 smallScreen.addEventListener('change', ()=>{ closeDrawer(); updateToggleButton(); });
 updateToggleButton();
 
-// ---------- Chat (wired to Flask /chat -> Chatbot.py) ----------
+// Chat (wired to Flask /chat -> Chatbot.py)
 function escapeHtml(text){
   return String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -296,14 +297,16 @@ function formatPartial(text){
 // is the student reading the newest message? (then new text keeps it in view)
 function nearBottom(el){ return el.scrollHeight - el.scrollTop - el.clientHeight < 90; }
 
-// ---------- Typing out an answer (top to bottom, like it's being written) ----------
+// Typing out an answer (top to bottom, like it's being written)
 let activeTyping = null;   // the answer currently being typed, so it can be finished early
 
 function finishTyping(){
   if(activeTyping) activeTyping.finish();
 }
 
-function typeMessage(text, token){
+// opts.actions: show Copy / feedback / Share / Regenerate under the answer once it is typed;
+// opts.question: the question it answers (used by Share and Regenerate)
+function typeMessage(text, token, opts = {}){
   finishTyping();
   const wrap = document.getElementById('chatMessages');
   const row = document.createElement('div');
@@ -338,6 +341,7 @@ function typeMessage(text, token){
     cancelAnimationFrame(frame);
     render(text.length);
     row.classList.remove('typing');
+    if(opts.actions) addAnswerActions(row, text, opts.question);
     if(activeTyping && activeTyping.row === row) activeTyping = null;
   };
 
@@ -360,14 +364,15 @@ function typeMessage(text, token){
   return row;
 }
 
-// "Thinking" bubble with three bouncing dots
+// "Thinking" bubble: only the five-bar loading animation is shown;
+// the label ("Thinking", "Reading your document") is read out by screen readers only
 function appendThinking(label){
   const wrap = document.getElementById('chatMessages');
   const row = document.createElement('div');
   row.className = 'msg-row bot thinking-row';
   row.innerHTML = `<div class="bubble thinking" role="status" aria-live="polite">
-      <span class="thinking-label">${escapeHtml(label)}</span>
-      <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span class="sr-only">${escapeHtml(label)}</span>
+      <span class="loading" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>
     </div>`;
   wrap.appendChild(row);
   wrap.scrollTop = wrap.scrollHeight;
@@ -387,6 +392,171 @@ function appendSignInPrompt(){
   row.scrollIntoView({behavior:'smooth', block:'end'});
 }
 
+// Under every answer (outside the bubble): Copy, Good/Bad response,
+// Download and Regenerate. Regenerate is only on the newest answer.
+const ANS_ICONS = {
+  copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+  feedback: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v12"></path><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"></path><path d="M17 14V2"></path><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"></path></svg>',
+  download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><polyline points="8 11 12 15 16 11"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>',
+  regenerate: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>',
+};
+
+function addAnswerActions(row, text, question){
+  if(!row || row.querySelector('.answer-actions')) return;
+  row._answer = text;
+  row._question = question || null;
+  row.classList.add('has-actions');
+  const bar = document.createElement('div');
+  bar.className = 'answer-actions';
+  bar.innerHTML = `
+    <button type="button" class="ans-btn" data-ans="copy" aria-label="Copy" title="Copy">${ANS_ICONS.copy}</button>
+    <div class="ans-tooltip-wrap">
+      <button type="button" class="ans-btn" data-ans="feedback" aria-label="Feedback" title="Rate this answer" aria-haspopup="menu" aria-expanded="false">${ANS_ICONS.feedback}</button>
+      <div class="ans-tooltip" role="menu">
+        <button type="button" class="ans-option" role="menuitem" data-rate="good">Good response</button>
+        <button type="button" class="ans-option" role="menuitem" data-rate="bad">Bad response</button>
+        <div class="ans-success" role="status">${ANS_ICONS.check}Submitted</div>
+      </div>
+    </div>
+    <button type="button" class="ans-btn" data-ans="download" aria-label="Download" title="Download this answer">${ANS_ICONS.download}</button>
+    <button type="button" class="ans-btn" data-ans="regenerate" aria-label="Regenerate" title="Regenerate this answer">${ANS_ICONS.regenerate}</button>`;
+  row.appendChild(bar);
+  updateRegenerateButtons();
+}
+
+// Regenerate: only on the newest answer, and only when it answered a question
+function updateRegenerateButtons(){
+  const rows = document.querySelectorAll('#chatMessages .msg-row.has-actions');
+  rows.forEach((r, i) => {
+    const btn = r.querySelector('[data-ans="regenerate"]');
+    if(btn) btn.hidden = !(i === rows.length - 1 && r._question);
+  });
+}
+
+function plainAnswer(text){ return String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').trim(); }
+
+async function copyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(err){
+    // older browsers / http pages: copy through a hidden text box
+    const box = document.createElement('textarea');
+    box.value = text; box.setAttribute('readonly', ''); box.style.position = 'fixed'; box.style.opacity = '0';
+    document.body.appendChild(box); box.select();
+    let ok = false;
+    try{ ok = document.execCommand('copy'); } catch(e){}
+    box.remove();
+    return ok;
+  }
+}
+
+// a small label above a button for a moment ("Copied")
+function flashLabel(btn, label){
+  const old = btn.parentElement.querySelector('.ans-flash');
+  if(old) old.remove();
+  const tag = document.createElement('span');
+  tag.className = 'ans-flash';
+  tag.textContent = label;
+  btn.insertAdjacentElement('afterend', tag);
+  setTimeout(() => tag.remove(), 1600);
+}
+
+function closeFeedbackMenus(except){
+  document.querySelectorAll('.ans-tooltip.show').forEach(t => {
+    if(t === except) return;
+    t.classList.remove('show');
+    const b = t.parentElement.querySelector('[data-ans="feedback"]');
+    b.classList.remove('active'); b.setAttribute('aria-expanded', 'false');
+  });
+}
+
+document.getElementById('chatMessages').addEventListener('click', async event => {
+  const row = event.target.closest('.msg-row.has-actions');
+  if(!row) return;
+  const option = event.target.closest('[data-rate]');
+  if(option){ submitFeedback(row, option.dataset.rate); return; }
+  const btn = event.target.closest('[data-ans]');
+  if(!btn) return;
+  const action = btn.dataset.ans;
+
+  if(action === 'copy'){
+    const ok = await copyText(plainAnswer(row._answer));
+    btn.innerHTML = ok ? ANS_ICONS.check : ANS_ICONS.copy;
+    btn.classList.toggle('done', ok);
+    flashLabel(btn, ok ? 'Copied' : 'Could not copy');
+    setTimeout(() => { btn.innerHTML = ANS_ICONS.copy; btn.classList.remove('done'); }, 1600);
+  }
+  else if(action === 'feedback'){
+    event.stopPropagation();
+    const tip = btn.parentElement.querySelector('.ans-tooltip');
+    if(tip.classList.contains('submitted')) return;
+    const open = !tip.classList.contains('show');
+    closeFeedbackMenus(tip);
+    tip.classList.toggle('show', open);
+    btn.classList.toggle('active', open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  else if(action === 'download'){
+    downloadAnswer(row);
+    flashLabel(btn, 'Downloaded');
+  }
+  else if(action === 'regenerate'){
+    const sendBtn = document.querySelector('.send-btn');
+    if(sendBtn.disabled || !row._question) return;      // an answer is already on its way
+    finishTyping();
+    const question = row._question;
+    row.remove();
+    updateRegenerateButtons();
+    await requestAnswer(question, true);
+  }
+});
+document.addEventListener('click', event => {
+  if(!event.target.closest('.ans-tooltip-wrap')) closeFeedbackMenus(null);
+});
+document.addEventListener('keydown', event => { if(event.key === 'Escape') closeFeedbackMenus(null); });
+
+// Download: the question and the answer as a text file, e.g. campus-ai-answer-2026-10-24-0717.txt
+function downloadAnswer(row){
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const when = now.toLocaleString('en-ZA', {day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'});
+  const lines = ['UNIZULU Campus AI Assistant', `Saved: ${when}`, ''];
+  if(row._question) lines.push('Question:', row._question, '');
+  lines.push('Answer:', plainAnswer(row._answer), '');
+  // "\ufeff" makes Notepad on Windows read letters such as é and the emoji correctly
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], {type: 'text/plain;charset=utf-8'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `campus-ai-answer-${stamp}-${pad(now.getHours())}${pad(now.getMinutes())}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+async function submitFeedback(row, rating){
+  const tip = row.querySelector('.ans-tooltip');
+  const btn = row.querySelector('[data-ans="feedback"]');
+  tip.classList.add('submitted');
+  btn.classList.remove('rated-good', 'rated-bad');
+  btn.classList.add(rating === 'good' ? 'rated-good' : 'rated-bad');
+  btn.title = rating === 'good' ? 'You rated this a good response' : 'You rated this a bad response';
+  try{
+    await api('/chat/feedback', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({rating, answer: row._answer, question: row._question, chat_id: currentChatId}),
+    });
+  } catch(err){ console.error(err); }
+  // like the design: show "Submitted", hide after 1.5 s, then reset the options
+  setTimeout(() => {
+    tip.classList.remove('show');
+    btn.classList.remove('active');
+    btn.setAttribute('aria-expanded', 'false');
+    setTimeout(() => tip.classList.remove('submitted'), 250);
+  }, 1500);
+}
+
 function appendMessage(text, who, scroll = true){
   const wrap = document.getElementById('chatMessages');
   const welcome = wrap.querySelector('.welcome');
@@ -399,19 +569,20 @@ function appendMessage(text, who, scroll = true){
   return row;
 }
 
-// ---------- Staged attachments: pick files, preview them, remove before
-// sending -- nothing is uploaded until the send button is actually pressed ----------
+// Staged attachments: nothing is uploaded until the send button is pressed
+// each staged file is {file, type}, type is 'academic_record' or 'proof_of_registration'
 let pendingFiles = [];
+const DOC_LABELS = {academic_record: 'Academic record', proof_of_registration: 'Proof of registration'};
 
 function renderAttachmentPreview(){
   const wrap = document.getElementById('attachmentPreview');
   wrap.innerHTML = '';
-  pendingFiles.forEach((file, i) => {
+  pendingFiles.forEach(({file, type}, i) => {
     const chip = document.createElement('div');
     chip.className = 'attachment-chip';
     const name = document.createElement('span');
     name.className = 'attachment-name';
-    name.textContent = `📎 ${file.name}`;
+    name.textContent = `📎 ${DOC_LABELS[type]}: ${file.name}`;
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'attachment-remove';
@@ -427,17 +598,57 @@ function renderAttachmentPreview(){
   wrap.style.display = pendingFiles.length ? 'flex' : 'none';
 }
 
-document.getElementById('uploadBtn').addEventListener('click', ()=>{
-  document.getElementById('fileInput').click();
+// Paperclip: first choose Academic record or Proof of registration, then the file
+const uploadBtn = document.getElementById('uploadBtn');
+const attachMenu = document.getElementById('attachMenu');
+
+function setAttachMenu(open){
+  attachMenu.hidden = !open;
+  uploadBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  uploadBtn.classList.toggle('open', open);
+  if(open) attachMenu.querySelector('[data-doc-type]').focus();
+}
+uploadBtn.addEventListener('click', event => {
+  event.stopPropagation();
+  setAttachMenu(attachMenu.hidden);
 });
-document.getElementById('fileInput').addEventListener('change', event=>{
-  pendingFiles = pendingFiles.concat(Array.from(event.target.files));
-  renderAttachmentPreview();
-  event.target.value = '';
+attachMenu.querySelectorAll('[data-doc-type]').forEach(item => {
+  item.addEventListener('click', () => {
+    document.getElementById('documentType').value = item.dataset.docType;
+    setAttachMenu(false);
+    document.getElementById('fileInput').click();
+  });
+});
+// clicking anywhere else, or Escape, closes the menu; arrow keys move between the two choices
+document.addEventListener('click', event => {
+  if(!attachMenu.hidden && !attachMenu.contains(event.target)) setAttachMenu(false);
+});
+attachMenu.addEventListener('keydown', event => {
+  const items = Array.from(attachMenu.querySelectorAll('[data-doc-type]'));
+  const i = items.indexOf(document.activeElement);
+  if(event.key === 'Escape'){ setAttachMenu(false); uploadBtn.focus(); }
+  else if(event.key === 'ArrowDown'){ event.preventDefault(); items[(i + 1) % items.length].focus(); }
+  else if(event.key === 'ArrowUp'){ event.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
 });
 
-async function uploadPendingFiles(files){
-  const documentType = document.getElementById('documentType').value;
+document.getElementById('fileInput').addEventListener('change', event=>{
+  const type = document.getElementById('documentType').value;
+  pendingFiles = pendingFiles.concat(Array.from(event.target.files).map(file => ({file, type})));
+  renderAttachmentPreview();
+  event.target.value = '';
+  document.getElementById('chatInput').focus();
+});
+
+async function uploadPendingFiles(staged){
+  // one upload per document type, so an academic record and a proof of
+  // registration attached together are each read as what they are
+  for(const type of ['academic_record', 'proof_of_registration']){
+    const files = staged.filter(s => s.type === type).map(s => s.file);
+    if(files.length) await uploadFilesOfType(files, type);
+  }
+}
+
+async function uploadFilesOfType(files, documentType){
   const label = documentType === 'academic_record' ? 'academic record' : 'proof of registration';
   const formData = new FormData();
   formData.append('document_type', documentType);
@@ -454,7 +665,7 @@ async function uploadPendingFiles(files){
       if(token === viewToken) appendMessage(data.error || 'The document could not be processed.', 'bot');
       return false;
     }
-    if(token === viewToken) typeMessage(data.message, token);
+    if(token === viewToken) typeMessage(data.message, token, {actions: true});
     afterReply(data, token);
     return true;
   } catch(err){
@@ -497,6 +708,17 @@ async function sendChat(){
   finishTyping();
   appendMessage(val, 'user');
   input.value = '';
+  await requestAnswer(val);
+}
+
+// asks the server and types the answer (sendChat, and Regenerate under the newest answer)
+async function requestAnswer(val, regenerate = false){
+  const input = document.getElementById('chatInput');
+  const sendBtn = document.querySelector('.send-btn');
+  const uploadBtn = document.getElementById('uploadBtn');
+  input.disabled = true;
+  sendBtn.disabled = true;
+  uploadBtn.disabled = true;
 
   const token = viewToken;
   const thinkingRow = appendThinking('Thinking');
@@ -505,7 +727,7 @@ async function sendChat(){
     const {res, data} = await api('/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: val, chat_id: currentChatId })
+      body: JSON.stringify({ question: val, chat_id: currentChatId, regenerate })
     });
 
     thinkingRow.remove();
@@ -518,7 +740,7 @@ async function sendChat(){
       }
     } else {
       if(token === viewToken){
-        typeMessage(data.answer, token);
+        typeMessage(data.answer, token, {actions: true, question: val});
         // e.g. a guest asking to check their registration: offer to sign in
         if(data.signin_prompt){ finishTyping(); appendSignInPrompt(); }
       }

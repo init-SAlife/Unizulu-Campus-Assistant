@@ -1,24 +1,28 @@
-// =====================================================================
-// app.js -- shared by both parts of the page: signing out, switching
-// between Home / AI Assistant / Campus Navigator, and start-up.
-// The AI Assistant's code is in chat.js, the Campus Navigator's in navigation.js.
-// Load order in index.html: app.js, chat.js, navigation.js.
-// =====================================================================
+// shared by all parts of the page: signing out, switching between Home / AI Assistant /
+// Explorer / Campus Navigator, and start-up.
 
-// ---------- Views: Home, AI Assistant, Campus Navigator ----------
-// The address bar follows the view, so refreshing the page stays where you were:
-//   /            Home
-//   /#chat       AI Assistant (new chat)    /?chat=<id>  AI Assistant (that chat)
-//   /#navigate   Campus Navigator
+// Views: Home, AI Assistant, Explorer, Campus Navigator
+// The address bar follows the view, so refreshing the page stays where you were
 let currentView = 'homeView';
 
 function showView(viewId){
   currentView = viewId;
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === viewId));
+  document.querySelectorAll('.side-link[data-view]').forEach(b => {
+    const on = b.dataset.view === viewId;
+    b.classList.toggle('active', on);
+    if(on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  // the menu on the left (and its open/close button) only appears inside a feature
+  document.body.classList.toggle('on-home', viewId === 'homeView');
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === viewId));
   if(viewId === 'chatView'){
     setChatInUrl(currentChatId);
     document.getElementById('chatInput').focus();
+  } else if(viewId === 'exploreView'){
+    // the Explorer keeps its own address (/#explore/...) and draws the page it names
+    if(!window.location.hash.startsWith('#explore')) history.replaceState(null, '', explorerLastAddress());
+    document.title = 'Explorer · UNIZULU Campus AI Assistant';
+    onExplorerShown();
   } else {
     if(viewId === 'navView') onNavigatorShown();
     history.replaceState(null, '', viewId === 'navView' ? '/#navigate' : '/');
@@ -27,23 +31,46 @@ function showView(viewId){
   window.scrollTo(0, 0);
 }
 
-document.querySelectorAll('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=> showView(btn.dataset.view));
+document.querySelectorAll('.side-link[data-view]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    showView(btn.dataset.view);
+    if(phoneLayout.matches) setMenuOpen(false);    // on a phone the menu sits above the page: fold it away
+  });
 });
-// the two buttons on the Home screen
+
+// Menu on the left: ✕ closes it, ☰ opens it (remembered on this device)
+const MENU_KEY = 'campusAI.menuClosed';
+const phoneLayout = window.matchMedia('(max-width: 700px)');
+const menuToggle = document.getElementById('menuToggle');
+function setMenuOpen(open, remember){
+  document.getElementById('layout').classList.toggle('collapsed', !open);
+  menuToggle.textContent = open ? '✕' : '☰';
+  menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if(remember){ try{ localStorage.setItem(MENU_KEY, open ? '0' : '1'); } catch(e){} }
+}
+menuToggle.addEventListener('click', ()=>{
+  const open = document.getElementById('layout').classList.contains('collapsed');
+  setMenuOpen(open, !phoneLayout.matches);
+});
+(function startMenu(){
+  let closed = false;
+  try{ closed = localStorage.getItem(MENU_KEY) === '1'; } catch(e){}
+  setMenuOpen(!(closed || phoneLayout.matches));   // phones start with the menu folded away
+})();
+// the buttons on the Home cards
 document.querySelectorAll('[data-go]').forEach(btn=>{
   btn.addEventListener('click', ()=> showView(btn.dataset.go));
 });
 
-// ---------- Signed-in user (or guest) and API calls ----------
+// Signed-in user (or guest) and API calls
 let currentUser = null;
 // guest mode: not signed in. The Campus Navigator works fully; the AI
 // Assistant allows a few questions a day (see guest.py on the server)
 let isGuest = false;
 
-// every call to the backend goes through here: if the sign-in has expired,
-// or a guest reaches something that needs an account (401), go to the
-// sign-in page instead of showing a broken chat
+// every call to the backend goes through here: if the sign-in has expired, or a guest reaches
+// something that needs an account (401)
 async function api(url, options = {}){
   const res = await fetch(url, {credentials: 'same-origin', ...options});
   if(res.status === 401){
@@ -54,7 +81,7 @@ async function api(url, options = {}){
   return {res, data};
 }
 
-// ---------- Account card (profile button in the header) ----------
+// Account card (profile button in the header)
 const accountOverlay = document.getElementById('accountOverlay');
 const profileBtn = document.getElementById('profileBtn');
 
@@ -70,6 +97,23 @@ function fillProfile(user){
     document.getElementById('detailEmail').textContent = user.email;
     document.getElementById('detailEmailRow').hidden = false;
   }
+  // admins: a way to their dashboard (menu on the left + account card)
+  const isAdmin = user.role === 'admin';
+  document.getElementById('sideAdmin').hidden = !isAdmin;
+  document.getElementById('adminRow').hidden = !isAdmin;
+}
+
+// someone who asked for an admin account: where their request is (account card)
+function showAdminRequest(req){
+  const row = document.getElementById('adminReqRow');
+  if(!row) return;
+  const text = {
+    pending: 'Admin request: waiting for approval',
+    rejected: 'Admin request was not approved',
+  }[req && req.status];
+  row.hidden = !text;
+  if(!text) return;
+  document.getElementById('adminReqText').textContent = text;
 }
 
 // "Profile" row (and the "Update Profile" button) show the student's details
@@ -84,7 +128,7 @@ function toggleProfileDetails(show){
 profileRow.addEventListener('click', () => toggleProfileDetails());
 document.getElementById('updateProfileBtn').addEventListener('click', () => toggleProfileDetails(true));
 
-// ---------- Account card: "More" button while there is more to scroll to ----------
+// Account card: "More" button while there is more to scroll to
 const accountPanel = document.getElementById('accountPanel');
 const acctScrollBtn = document.getElementById('acctScrollBtn');
 
@@ -130,7 +174,7 @@ function closeAccount(){
   profileBtn.focus();
 }
 
-// ---------- Settings: appearance (light / dark) ----------
+// Settings: appearance (light / dark)
 function syncThemeSwitch(){
   const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   document.querySelectorAll('.theme-opt').forEach(btn => {
@@ -149,7 +193,7 @@ document.querySelectorAll('.theme-opt').forEach(btn => {
 });
 syncThemeSwitch();
 
-// ---------- Settings: change password ----------
+// Settings: change password
 const passwordRow = document.getElementById('passwordRow');
 const passwordPanel = document.getElementById('passwordPanel');
 const passwordForm = document.getElementById('changePasswordForm');
@@ -216,7 +260,7 @@ document.getElementById('signOutBtn').addEventListener('click', async ()=>{
   finally{ window.location.href = '/login'; }
 });
 
-// ---------- Guest mode ----------
+// Guest mode
 function startGuestMode(allowance){
   isGuest = true;
   document.body.classList.add('guest');
@@ -243,7 +287,7 @@ function updateGuestAllowance(allowance){
   banner.classList.toggle('used-up', left <= 0);
 }
 
-// ---------- Start-up: who is signed in, their chats, and which chat to show ----------
+// Start-up: who is signed in, their chats, and which chat to show
 async function boot(){
   let me;
   try{
@@ -266,6 +310,7 @@ async function boot(){
 
   currentUser = me.user;
   fillProfile(currentUser);
+  showAdminRequest(currentUser.role === 'admin' ? null : me.admin_request);
   const firstName = currentUser.full_name.trim().split(' ')[0];
   document.getElementById('homeName').textContent = firstName ? `, ${firstName}` : '';
   showViewForAddress(chatFromUrl);
@@ -278,11 +323,30 @@ async function boot(){
 function showViewForAddress(chatFromUrl){
   const hash = window.location.hash;
   if(chatFromUrl || hash === '#chat') showView('chatView');
+  else if(hash.startsWith('#explore')) showView('exploreView');
   else if(hash === '#navigate') showView('navView');
   else showView('homeView');
 }
-// typing /#chat or /#navigate into the address bar (without reloading) switches view too
+
+// "Ask the AI Assistant about this" (Explorer pages): open a new chat with the question typed
+// in.
+function askAssistant(question){
+  // keep the Explorer page in the history, so Back returns to it from the chat
+  history.pushState(null, '', window.location.href);
+  showView('chatView');
+  newChat();
+  const input = document.getElementById('chatInput');
+  input.value = question;
+  if(isGuest){
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  } else {
+    sendChat();
+  }
+}
+// typing /#chat, /#explore... or /#navigate into the address bar (without reloading)
+// switches view too -- and the Explorer's own links (#explore/module/...) work this way
 window.addEventListener('hashchange', ()=> showViewForAddress(null));
 
-// start once all three scripts (app.js, chat.js, navigation.js) have loaded
+// start once all the scripts (app.js, chat.js, explorer.js, navigation.js) have loaded
 window.addEventListener('DOMContentLoaded', boot);

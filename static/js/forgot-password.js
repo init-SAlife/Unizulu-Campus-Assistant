@@ -1,9 +1,4 @@
-// =====================================================================
-// forgot-password.js -- "Forgotten password?" in three steps:
-//   1. email   -> POST /auth/password/forgot   (a 6-digit code is emailed)
-//   2. code    -> POST /auth/password/verify   (gives a one-time reset token)
-//   3. new pw  -> POST /auth/password/reset
-// =====================================================================
+// "Forgotten password?" in three steps
 
 const reset = { email: '', token: '', step: 1 };
 let resendTimer = null;
@@ -62,7 +57,7 @@ function goTo(n){
   if(first) setTimeout(() => first.focus(), 60);
 }
 
-// ---------- Step 1: email ----------
+// Step 1: email
 async function sendCode(isResend){
   const email = isResend ? reset.email : document.getElementById('resetEmail').value.trim();
   const n = isResend ? 2 : 1;
@@ -78,14 +73,18 @@ async function sendCode(isResend){
     const {res, data} = await postJSON('/auth/password/forgot', {email});
     if(!res.ok){
       showError(n, data.error || 'Something went wrong. Please try again.');
-      if(isResend) document.getElementById('resendBtn').disabled = false;
+      if(isResend){
+        if(typeof data.left === 'number') showLeft(data.left, data.per_day);
+        startResendCountdown(data.wait || 0, data.left === 0);
+      }
       return;
     }
     reset.email = email;
     document.getElementById('sentTo').textContent = email;
     document.getElementById('codeMinutes').textContent = data.minutes || 10;
     clearCode();
-    startResendCountdown(data.resend_after || 60);
+    showLeft(data.left, data.per_day);
+    startResendCountdown(data.resend_after || 0, data.left === 0);
     if(isResend) showError(2, '');
     goTo(2);
     if(isResend) flashNote('A new code is on its way.');
@@ -97,20 +96,31 @@ async function sendCode(isResend){
   }
 }
 
-function startResendCountdown(seconds){
+// how many code emails are left today (shared with sign-up and sign-in codes)
+function showLeft(left, perDay){
+  const box = document.getElementById('resetLeft');
+  if(typeof left !== 'number'){ box.textContent = ''; return; }
+  perDay = perDay || 5;
+  box.textContent = left > 0 ? `${left} of ${perDay} code emails left today`
+    : `No code emails left today (${perDay} a day). You can ask again after midnight.`;
+  box.classList.toggle('none', left <= 0);
+}
+
+function startResendCountdown(seconds, noneLeft){
   const btn = document.getElementById('resendBtn');
   const wait = document.getElementById('resendWait');
   clearInterval(resendTimer);
-  let left = seconds;
+  let left = Math.max(0, Math.round(seconds));
   btn.disabled = true;
   const tick = () => {
+    if(noneLeft){ clearInterval(resendTimer); wait.textContent = ''; return; }
     if(left <= 0){
       clearInterval(resendTimer);
       btn.disabled = false;
       wait.textContent = '';
       return;
     }
-    wait.textContent = `(in ${left}s)`;
+    wait.textContent = `(in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')})`;
     left--;
   };
   tick();
@@ -134,7 +144,7 @@ document.getElementById('changeEmailBtn').addEventListener('click', () => {
   goTo(1);
 });
 
-// ---------- Step 2: the 6 code boxes ----------
+// Step 2: the 6 code boxes
 const boxes = Array.from(document.querySelectorAll('.otp-box'));
 
 function codeValue(){ return boxes.map(b => b.value).join(''); }
@@ -201,7 +211,7 @@ screen(2).addEventListener('submit', async e => {
   }
 });
 
-// ---------- Step 3: new password ----------
+// Step 3: new password
 screen(3).addEventListener('submit', async e => {
   e.preventDefault();
   const pw = document.getElementById('newPassword').value;

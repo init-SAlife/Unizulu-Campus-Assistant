@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · UNIZULU Campus AI Assistant</title>
+<link rel="icon" type="image/png" href="/img/unizulu-logo.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- the same look as the student side: header, menu on the left, campus photo, profile button -->
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+<script src="/js/common.js"></script>
+<!-- Chart.js 4.4.1 is kept in the project (no internet needed for the charts) -->
+<script src="/js/vendor/chart.umd.min.js"></script>
+</head>
+<body class="app-page admin-page">
+
+<header>
+  <button type="button" id="menuToggle" class="menu-toggle" aria-controls="sideNav" aria-expanded="true" aria-label="Close menu">✕</button>
+  <img class="brand-logo" src="/img/unizulu-logo.png" alt="University of Zululand" onerror="this.remove()">
+  <h1 class="brand-title">Campus AI Assistant <span class="role-tag">ADMIN</span></h1>
+  <button type="button" id="profileBtn" class="profile-btn" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Your account" title="Your account">
+    <span id="profileInitial" class="profile-initial" aria-hidden="true">A</span>
+  </button>
+</header>
+
+<!-- ACCOUNT CARD (same as the student side) -->
+<div id="accountOverlay" class="acct-overlay" hidden>
+  <div id="accountPanel" class="acct-panel" role="dialog" aria-modal="true" aria-labelledby="acctTitle">
+    <div class="acct-header">
+      <h2 id="acctTitle">Account</h2>
+      <button type="button" id="acctClose" class="acct-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="acct-profile">
+      <div class="acct-avatar" id="acctAvatar" aria-hidden="true">A</div>
+      <h1 class="acct-name" id="acctName">Admin</h1>
+      <p class="acct-email" id="acctEmail"></p>
+      <span class="role-tag">ADMIN</span>
+    </div>
+    <p class="acct-section-label">Settings</p>
+    <div class="acct-menu">
+      <div class="acct-item acct-static">
+        <span class="acct-icon"><i class="fa-solid fa-circle-half-stroke"></i></span>
+        <span class="acct-text">Appearance</span>
+        <div class="theme-switch" role="radiogroup" aria-label="Appearance">
+          <button type="button" class="theme-opt" data-theme-choice="light" role="radio" aria-checked="true"><i class="fa-solid fa-sun"></i> Light</button>
+          <button type="button" class="theme-opt" data-theme-choice="dark" role="radio" aria-checked="false"><i class="fa-solid fa-moon"></i> Dark</button>
+          <span class="theme-thumb" aria-hidden="true"></span>
+        </div>
+      </div>
+      <a class="acct-item" href="/">
+        <span class="acct-icon"><i class="fa-solid fa-arrow-left"></i></span>
+        <span class="acct-text">Back to the app</span>
+        <i class="fa-solid fa-chevron-right acct-arrow"></i>
+      </a>
+    </div>
+    <div class="acct-menu acct-signout-list">
+      <button type="button" id="logoutBtn" class="acct-item acct-signout">
+        <span class="acct-icon"><i class="fa-solid fa-arrow-right-from-bracket"></i></span>
+        <span class="acct-text">Log out</span>
+      </button>
+    </div>
+    <p class="acct-footer">Secured by <strong><i class="fa-solid fa-lock"></i> unizulu</strong></p>
+  </div>
+</div>
+
+<div class="layout" id="layout">
+<!-- menu on the left (same as the student side) -->
+<nav class="sidenav mainnav" id="sideNav" aria-label="Admin menu">
+  <a href="#" class="side-link active" data-tab="dashboard">📊 Dashboard</a>
+  <a href="#" class="side-link" data-tab="users">👥 User Management</a>
+  <a href="#" class="side-link" data-tab="requests">🙋 Admin Requests <span class="count" id="reqCount" hidden>0</span></a>
+  <a href="#" class="side-link" data-tab="feedback">💬 Feedback Inbox <span class="count" id="openCount" hidden>0</span></a>
+  <a href="#" class="side-link" data-tab="sessions">🕒 Admin Sessions</a>
+  <a href="#" class="side-link" data-tab="audit">🛡️ Audit Log</a>
+  <a href="/" class="side-link back">↩ Back to app</a>
+</nav>
+
+<div class="main">
+<main class="admin-main">
+  <div class="subrow">
+    <h2 class="title" id="pageTitle">Overview</h2>
+    <div class="actions">
+      <select class="pill" id="range" aria-label="Period">
+        <option value="7">Last 7 days</option>
+        <option value="30">Last 30 days</option>
+        <option value="semester">This semester</option>
+        <option value="year">This year</option>
+      </select>
+      <button type="button" class="a-icon-btn" id="searchBtn" title="Search" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg></button>
+      <button type="button" class="a-icon-btn" id="bellBtn" title="Open feedback" aria-label="Open feedback"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span class="dot" id="bellDot" hidden></span></button>
+      <button class="btn" id="exportBtn">⇪ Export CSV</button>
+      <button class="btn primary" id="refreshBtn">⟳ Refresh</button>
+    </div>
+  </div>
+
+<div class="page">
+
+  <!-- dashboard -->
+  <section class="panel" id="panel-dashboard">
+    <div class="stats">
+      <div class="stat"><small>Total users</small><strong id="sUsers">–</strong><span id="dUsers"></span></div>
+      <div class="stat"><small id="lActive">Active users</small><strong id="sActive">–</strong><span id="dActive"></span></div>
+      <div class="stat"><small id="lChats">Questions asked</small><strong id="sChats">–</strong><span id="dChats"></span></div>
+      <div class="stat"><small>Helpful answers</small><strong id="sHelpful">–</strong><span id="dHelpful"></span></div>
+      <div class="stat"><small>Registration checks</small><strong id="sReg">–</strong><span id="dReg"></span></div>
+      <div class="stat"><small>Navigator routes</small><strong id="sRoutes">–</strong><span id="dRoutes"></span></div>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Questions asked</h2>
+              <p id="lineSub">AI Assistant questions per day</p>
+            </div>
+            <div class="legend">
+              <span><i style="background:var(--a-orange)"></i><span id="legNow">This period</span></span>
+              <span><i style="background:var(--text-dim)"></i><span id="legPrev">Previous period</span></span>
+            </div>
+          </div>
+          <div class="chart-box"><canvas id="lineChart"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h2>Recent activity</h2><p>Latest admin and system actions</p></div>
+            <button class="btn sm" style="margin-left:auto" data-tab="audit">View all</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Time</th><th>User</th><th>Action</th></tr></thead>
+              <tbody id="recentAudit"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <div class="card-head"><div><h2>Answer feedback</h2><p>Thumbs up and down on answers</p></div></div>
+          <div class="rating">
+            <div class="ring-box"><canvas id="ringChart"></canvas><b id="ringPct">–</b></div>
+            <div class="rating-rows">
+              <div><span>👍 Helpful</span><b id="upCount">0</b></div>
+              <div><span>👎 Not helpful</span><b id="downCount">0</b></div>
+              <div><span>Open reports</span><b class="down" id="openReports">0</b></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div><h2>Feedback inbox</h2><p>Newest "Bad response" ratings from users</p></div>
+            <button class="btn sm" style="margin-left:auto" data-tab="feedback">Open inbox</button>
+          </div>
+          <div class="fb" id="recentFeedback"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- performance throughout the year -->
+    <div class="card year-card">
+      <div class="card-head">
+        <div>
+          <h2>Performance throughout the years</h2>
+          <p id="yearSub">Totals for every year since launch</p>
+        </div>
+        <div class="metric-tabs" id="viewTabs">
+          <button class="on" data-view="years">All years</button>
+          <button data-view="months">By month</button>
+          <select class="pill" id="yearSelect" style="display:none"></select>
+        </div>
+      </div>
+      <div class="card-head" style="margin-top:-4px">
+        <div class="metric-tabs" id="metricTabs" style="margin-left:0">
+          <button class="on" data-metric="questions">Questions</button>
+          <button data-metric="users">Active users</button>
+          <button data-metric="helpful">Helpful %</button>
+          <button data-metric="registration">Registration checks</button>
+          <button data-metric="routes">Navigator routes</button>
+        </div>
+      </div>
+      <div class="year-summary">
+        <div><small id="ysTotalLabel">Total</small><b id="ysTotal">0</b></div>
+        <div><small id="ysAvgLabel">Yearly average</small><b id="ysAvg">0</b></div>
+        <div><small id="ysBestLabel">Best year</small><b id="ysBest">-</b></div>
+        <div><small id="ysChangeLabel">Change vs last year</small><b id="ysChange">0%</b></div>
+      </div>
+      <div class="legend" style="margin:0 0 10px">
+        <span><i style="background:var(--a-chart)"></i><span id="legA">Year total</span></span>
+        <span id="legBWrap"><i style="background:var(--a-orange)"></i><span id="legB">Previous year</span></span>
+      </div>
+      <div class="year-box"><canvas id="yearChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- users -->
+  <section class="panel" id="panel-users" hidden>
+    <div class="card">
+      <div class="toolbar">
+        <input class="search" id="userSearch" placeholder="Search by name or email">
+        <select class="pill" id="roleFilter">
+          <option value="">All roles</option>
+          <option value="admin">Admin</option>
+          <option value="student">Student</option>
+        </select>
+        <select class="pill" id="statusFilter">
+          <option value="">Any status</option>
+          <option value="active">Active</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Chats</th><th>Last active</th><th></th></tr></thead>
+          <tbody id="userRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- admin requests -->
+  <section class="panel" id="panel-requests" hidden>
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Requests for an admin account</h2>
+          <p>People who chose "Administrator" on Create account and confirmed their email with the code.
+             Approving makes their account an admin; they get an email either way.</p></div>
+      </div>
+      <div class="toolbar">
+        <input class="search" id="reqSearch" placeholder="Search by name, email or role">
+        <select class="pill" id="reqFilter">
+          <option value="pending">Waiting</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="req-list" id="reqList"></div>
+    </div>
+  </section>
+
+  <!-- feedback -->
+  <section class="panel" id="panel-feedback" hidden>
+    <div class="card">
+      <div class="toolbar">
+        <input class="search" id="fbSearch" placeholder="Search feedback">
+        <select class="pill" id="fbFilter">
+          <option value="open">Open</option>
+          <option value="done">Resolved</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="fb" id="allFeedback"></div>
+    </div>
+  </section>
+
+  <!-- admin sessions -->
+  <section class="panel" id="panel-sessions" hidden>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head">
+        <div><h2>Your current session</h2><p>Everything you do is recorded until you log out</p></div>
+        <span class="live" style="margin-left:auto">Live</span>
+      </div>
+      <div class="now-grid">
+        <div><small>Admin</small><b id="curAdmin">-</b></div>
+        <div><small>Logged in</small><b id="curLogin">-</b></div>
+        <div><small>Time active</small><b id="curDuration">0m</b></div>
+        <div><small>Actions so far</small><b id="curCount">0</b></div>
+      </div>
+      <ul class="acts" id="curActs"></ul>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Session history</h2><p>Every admin login, logout and what was done. Click a row to see the actions.</p></div>
+      </div>
+      <div class="toolbar">
+        <input class="search" id="sessSearch" placeholder="Search by admin, IP or action">
+        <select class="pill" id="sessAdmin"><option value="">All admins</option></select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Admin</th><th>Logged in</th><th>Logged out</th><th>Duration</th><th>Actions</th><th>Ended by</th><th>IP</th></tr></thead>
+          <tbody id="sessRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- audit log -->
+  <section class="panel" id="panel-audit" hidden>
+    <div class="card">
+      <div class="toolbar">
+        <input class="search" id="auditSearch" placeholder="Search audit log">
+        <select class="pill" id="auditSource">
+          <option value="">Admins and app</option>
+          <option value="admin">Admin actions only</option>
+          <option value="app">App events only</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+          <tbody id="auditRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+</main>
+<footer>University of Zululand · KwaDlangezwa 3886 · Campus AI Assistant v3.0 · Admin</footer>
+</div>
+</div>
+
+<!-- shown when the admin logs out -->
+<div class="modal-bg" id="logoutModal">
+  <div class="modal">
+    <h2>You have logged out</h2>
+    <p>Here is what was done in this session. It has been saved to the admin session history.</p>
+    <div class="now-grid">
+      <div><small>Logged in</small><b id="sumLogin">-</b></div>
+      <div><small>Logged out</small><b id="sumLogout">-</b></div>
+      <div><small>Duration</small><b id="sumDuration">-</b></div>
+      <div><small>Actions done</small><b id="sumCount">0</b></div>
+    </div>
+    <ul class="acts" id="sumActs"></ul>
+    <div class="modal-actions">
+      <button class="btn primary" id="toLogin">Go to login page</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="/js/admin.js"></script>
+<script src="/js/offline.js"></script>
+</body>
+</html>

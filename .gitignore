@@ -1,12 +1,11 @@
-# ---- secrets: NEVER upload these ----
+# secrets: never upload these
 .env
 **/.env
 
-# ---- personal student documents (records, proof of registration) ----
+# personal student documents (records, proof of registration)
 documents/
-files/
 
-# ---- local-only stuff ----
+# local only
 campus_env/
 venv/
 .venv/
@@ -14,7 +13,7 @@ __pycache__/
 *.pyc
 .vscode/
 conversation_memory.json
-Navigation 1.zip
 *.dump
 *.sql.backup
 campus_backup.sql
+parking_status.db*

@@ -3,26 +3,22 @@ import secrets
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, send_from_directory
+from flask import Flask, redirect, request, send_from_directory
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-import Chatbot   # noqa: E402  (after load_dotenv: reads the database and Claude settings)
-import accounts  # noqa: E402
-from auth_routes import auth_bp, current_user  # noqa: E402
+from services import Chatbot   # noqa: E402  (after load_dotenv: reads the database and Claude settings)
+from services import accounts  # noqa: E402
+from routes.auth_routes import auth_bp, current_user  # noqa: E402
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
-# The browser must always check for the newest html/js/css instead of reusing
-# an old copy, so changes to the files in static/ show up after a reload.
-# (Files that have not changed still load quickly: the server just answers
-# "not modified".)
+# The browser must always check for the newest html/js/css instead of reusing an old copy, so
+# changes to the files in static/ show up after a reload.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
-# The login cookie is signed with FLASK_SECRET_KEY. Set it in .env so users
-# stay signed in when the server restarts; without it a random key is made
-# at start-up and everyone has to sign in again after every restart.
+# The login cookie is signed with FLASK_SECRET_KEY.
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 if not app.secret_key:
     app.secret_key = secrets.token_hex(32)
@@ -40,12 +36,22 @@ app.config.update(
 accounts.init_pool(Chatbot.DB_CONFIG)
 accounts.ensure_schema()
 
-from chatbot_routes import chatbot_bp        # noqa: E402  AI Assistant
-from navigation_routes import navigation_bp  # noqa: E402  Campus Navigator
+# Campus Navigator: calculate routes inside the web process (in its threads) unless
+# ROUTE_WORKERS is set.
+os.environ.setdefault("ROUTE_WORKERS", "0")
+
+from routes.chatbot_routes import chatbot_bp        # noqa: E402  AI Assistant
+from routes.explorer_routes import explorer_bp      # noqa: E402  Programme & Module Explorer
+from routes.navigation_routes import navigation_bp  # noqa: E402  Campus Navigator (walk, car + walk, car only, parking)
+from routes.admin_sessions import admin_sessions_bp   # noqa: E402  Admin: login/logout/action tracking
+from routes.admin_routes import admin_bp              # noqa: E402  Admin dashboard (/admin) and its data
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(chatbot_bp)
+app.register_blueprint(explorer_bp)
 app.register_blueprint(navigation_bp)
+app.register_blueprint(admin_sessions_bp)
+app.register_blueprint(admin_bp)
 
 
 @app.after_request
@@ -59,15 +65,16 @@ def no_stale_pages(response):
 
 @app.route("/")
 def serve_index():
-    # open to everyone: guests get the Campus Navigator and a few AI
-    # Assistant questions (see guest.py); signing in unlocks the rest
+    # open to everyone: guests get the Explorer, the Campus Navigator and a
+    # few AI Assistant questions (see guest.py); signing in unlocks the rest
     return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/login")
 def serve_login():
-    if current_user():
-        return redirect("/")
+    user = current_user()
+    if user:
+        return redirect("/admin" if user.get("role") == "admin" and request.args.get("next") == "/admin" else "/")
     return send_from_directory(app.static_folder, "login.html")
 
 

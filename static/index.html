@@ -11,17 +11,14 @@
 <link rel="icon" type="image/png" href="img/unizulu-logo.png">
 <script src="js/common.js"></script>
 </head>
-<body class="app-page">
+<body class="app-page on-home">
 
 <header>
-  <div class="brand">
-    <!-- UNIZULU logo: save it as static/img/unizulu-logo.png (hidden if the file is missing) -->
-    <img class="brand-logo" src="img/unizulu-logo.png" alt="University of Zululand logo" onerror="this.remove()">
-    <div class="brand-text">
-      <span class="eyebrow">UNIZULU</span>
-      <span class="title">Campus AI Assistant</span>
-    </div>
-  </div>
+  <!-- opens / closes the menu on the left (not shown on Home) -->
+  <button type="button" id="menuToggle" class="menu-toggle" aria-controls="sideNav" aria-expanded="true" aria-label="Close menu">✕</button>
+  <!-- UNIZULU logo: save it as static/img/unizulu-logo.png (hidden if the file is missing) -->
+  <img class="brand-logo" src="img/unizulu-logo.png" alt="University of Zululand" onerror="this.remove()">
+  <h1 class="brand-title">Campus AI Assistant</h1>
   <!-- profile button: shows the student's initial, opens the Account card -->
   <button type="button" id="profileBtn" class="profile-btn" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Your account" title="Your account">
     <span id="profileInitial" class="profile-initial" aria-hidden="true"></span>
@@ -30,8 +27,7 @@
   <a id="signInBtn" class="signin-btn" href="/login" aria-label="Sign in" hidden><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span class="signin-label">Sign in</span></a>
 </header>
 
-<!-- ===================== ACCOUNT (profile) CARD =====================
-     Replaces the old "name + Log out" box. Opens from the profile button above. -->
+<!-- Account (profile) card: opens from the profile button -->
 <div id="accountOverlay" class="acct-overlay" hidden>
   <div id="accountPanel" class="acct-panel" role="dialog" aria-modal="true" aria-labelledby="acctTitle">
 
@@ -56,6 +52,18 @@
         <i class="fa-solid fa-chevron-right acct-arrow"></i>
       </button>
       <!-- shown when "Profile" is tapped: the signed-in student's details -->
+      <!-- admins only (shown by app.js) -->
+      <a id="adminRow" class="acct-item" href="/admin" hidden>
+        <span class="acct-icon"><i class="fa-solid fa-shield-halved"></i></span>
+        <span class="acct-text">Admin dashboard</span>
+        <i class="fa-solid fa-chevron-right acct-arrow"></i>
+      </a>
+      <!-- asked for an admin account (shown by app.js) -->
+      <a id="adminReqRow" class="acct-item admin-req-row" href="/login?verify=admin" hidden>
+        <span class="acct-icon"><i class="fa-solid fa-user-shield"></i></span>
+        <span class="acct-text" id="adminReqText">Admin request</span>
+        <i class="fa-solid fa-chevron-right acct-arrow"></i>
+      </a>
       <dl id="profileDetails" class="acct-details" hidden>
         <div><dt>Full name</dt><dd id="detailName"></dd></div>
         <div id="detailEmailRow" hidden><dt>Email</dt><dd id="detailEmail"></dd></div>
@@ -129,57 +137,74 @@
   </div>
 </div>
 
-<nav>
-  <button class="tab-btn active" data-view="homeView">🏠 Home</button>
-  <button class="tab-btn" data-view="chatView">💬 AI Assistant</button>
-  <button class="tab-btn" data-view="navView">📍 Campus Navigator</button>
+<div class="layout" id="layout">
+<!-- vertical menu on the left: only inside a feature, never on Home -->
+<nav class="sidenav" id="sideNav" aria-label="Main menu">
+  <button type="button" class="side-link active" data-view="homeView">🏠 Home</button>
+  <button type="button" class="side-link" data-view="chatView">💬 AI Assistant</button>
+  <button type="button" class="side-link" data-view="exploreView">📚 Explorer</button>
+  <button type="button" class="side-link" data-view="navView">📍 Campus Navigator</button>
+  <!-- admins only (shown by app.js) -->
+  <a class="side-link side-admin" id="sideAdmin" href="/admin" hidden>🛡️ Admin</a>
 </nav>
 
+<div class="main">
 <main>
 
-  <!-- ===================== HOME: choose what to use ===================== -->
+  <!-- HOME: choose what to use -->
   <section id="homeView" class="view active">
-    <div class="home">
-      <h1 class="home-greeting">Sawubona<span id="homeName"></span>!</h1>
-      <p class="home-question">What would you like to use today?</p>
+    <div class="home content">
+      <h2 class="home-greeting">Sawubona<span id="homeName"></span>!</h2>
+      <p class="home-question sub">What would you like to use today?</p>
 
-      <div class="home-choices">
-        <article class="home-card">
-          <div class="home-card-icon" aria-hidden="true">💬</div>
-          <h2>AI Assistant</h2>
+      <div class="home-choices cards">
+        <article class="home-card card">
+          <div class="home-card-icon icon" aria-hidden="true">💬</div>
+          <h3>AI Assistant</h3>
           <p>Ask questions about your studies and get answers from the official FSAE handbooks.</p>
           <!-- guests only: how much of the AI Assistant they can use -->
           <p class="home-badge guest-only"><span id="homeGuestLimit">A few questions a day</span> in guest mode</p>
           <!-- data-guest: "yes" = works in guest mode, "no" = needs an account (marked 🔒 for guests) -->
           <ul class="home-features">
-            <li data-guest="yes">Programmes, modules, electives and credits needed to graduate</li>
-            <li data-guest="yes">Module prerequisites and admission requirements</li>
-            <li data-guest="no">Check your proof of registration against your programme</li>
-            <li data-guest="no">Upload your academic record to see what you have passed and what is still outstanding</li>
-            <li data-guest="no">Your chats are saved, so you can continue any chat later</li>
+            <li data-guest="yes">Programmes, modules, electives and credits</li>
+            <li data-guest="no">Check your proof of registration</li>
+            <li data-guest="no">Upload your academic record</li>
+            <li data-guest="no">Your chats are saved</li>
           </ul>
           <p class="home-guest-note guest-only">🔒 These need a free account. <a href="/login">Sign in</a> or <a href="/login?mode=register">create an account</a> to unlock them.</p>
-          <button type="button" class="home-btn" data-go="chatView">Use the AI Assistant</button>
+          <button type="button" class="home-btn btn" data-go="chatView">Use the AI Assistant</button>
         </article>
 
-        <article class="home-card">
-          <div class="home-card-icon" aria-hidden="true">📍</div>
-          <h2>Campus Navigator</h2>
-          <p>Find your way around the KwaDlangezwa campus.</p>
-          <p class="home-badge home-badge-open guest-only">Free for everyone · no account needed</p>
+        <article class="home-card card highlight">
+          <div class="home-card-icon icon" aria-hidden="true">📚</div>
+          <h3>Programme &amp; Module Explorer</h3>
+          <p>Look up any Science programme or module yourself, straight from the handbook.</p>
+          <span class="badge">New · free for everyone, no account needed</span>
           <ul class="home-features">
-            <li>Find lecture venues, faculties, the library and student offices</li>
-            <li>Start from your current location or from another building</li>
-            <li>See the campus on the map and get a route to where you are going</li>
+            <li>Search a module code, e.g. 4MTH222</li>
+            <li>See every programme a module is in, and whether it is compulsory, a major or an elective</li>
+            <li>Programme curriculum by year and semester</li>
+            <li>Admission requirements</li>
           </ul>
-          <p class="home-note">Directions are for walking. The route updates as you walk.</p>
-          <button type="button" class="home-btn" data-go="navView">Use the Campus Navigator</button>
+          <button type="button" class="home-btn btn" data-go="exploreView">Open the Explorer</button>
+        </article>
+
+        <article class="home-card card">
+          <div class="home-card-icon icon" aria-hidden="true">📍</div>
+          <h3>Campus Navigator</h3>
+          <p>Find your way around the KwaDlangezwa campus.</p>
+          <ul class="home-features">
+            <li>Find lecture venues, faculties and offices</li>
+            <li>Start from your current location</li>
+            <li>Get a walking or driving route on the map, with parking</li>
+          </ul>
+          <button type="button" class="home-btn btn" data-go="navView">Use the Campus Navigator</button>
         </article>
       </div>
     </div>
   </section>
 
-  <!-- ===================== AI ASSISTANT VIEW ===================== -->
+  <!-- AI ASSISTANT VIEW -->
   <section id="chatView" class="view">
 
     <!-- chat list: every chat this user has had, newest first -->
@@ -227,19 +252,58 @@
     <div id="attachmentPreview" class="attachment-preview"></div>
     <div class="chat-input-bar">
       <input id="fileInput" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple hidden>
-      <select id="documentType" class="document-type" aria-label="Document type">
+      <!-- the document type is chosen in the paperclip's menu (chat.js keeps it with each file) -->
+      <select id="documentType" class="document-type" aria-label="Document type" hidden>
         <option value="academic_record">Academic record</option>
         <option value="proof_of_registration">Proof of registration</option>
       </select>
-      <button id="uploadBtn" class="icon-btn" type="button" title="Attach academic record or proof of registration" aria-label="Attach document">⬆</button>
-      <input id="chatInput" type="text" placeholder="Ask a question, upload a file, or speak...">
-      <button id="micBtn" class="icon-btn" type="button" title="Speak" aria-label="Speak">🎤</button>
+      <div class="attach-wrap">
+      <!-- attach: paperclip in a pill -->
+      <button id="uploadBtn" class="attach-pill" type="button" title="Attach academic record or proof of registration" aria-label="Attach document" aria-haspopup="menu" aria-expanded="false" aria-controls="attachMenu">
+        <svg class="attach-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+        </svg>
+      </button>
+        <div id="attachMenu" class="attach-menu" role="menu" hidden>
+          <p class="attach-menu-title">What are you attaching?</p>
+          <button type="button" role="menuitem" data-doc-type="academic_record">
+            <span class="attach-menu-icon" aria-hidden="true">🎓</span>
+            <span><strong>Academic record</strong><small>See what you have passed and what is still outstanding</small></span>
+          </button>
+          <button type="button" role="menuitem" data-doc-type="proof_of_registration">
+            <span class="attach-menu-icon" aria-hidden="true">🧾</span>
+            <span><strong>Proof of registration</strong><small>Check your registered modules against your programme</small></span>
+          </button>
+          <p class="attach-menu-note">PDF, PNG or JPG</p>
+        </div>
+      </div>
+      <input id="chatInput" type="text" placeholder="Ask a question, attach a document, or speak...">
+      <!-- speak: green microphone button (turns red and pulses while listening) -->
+      <button id="micBtn" class="mic-button" type="button" title="Speak" aria-label="Voice input">
+        <svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+      </button>
       <button class="send-btn" onclick="sendChat()" aria-label="Send">➤</button>
     </div>
     </div>
   </section>
 
-  <!-- ===================== CAMPUS NAVIGATOR VIEW ===================== -->
+  <!-- Programme & Module Explorer: pages are drawn by explorer.js -->
+  <section id="exploreView" class="view">
+    <div id="exCrumbs" class="ex-crumbs" role="navigation" aria-label="Breadcrumb"></div>
+    <!-- guests only -->
+    <div class="ex-guest guest-only">
+      <span><strong>Guest mode</strong> · the Explorer is free for everyone.</span>
+      <span><a href="/login">Sign in</a> to ask the AI Assistant about your own registration.</span>
+    </div>
+    <div id="exPage" class="ex-page" aria-live="polite"></div>
+  </section>
+
+  <!-- Campus Navigator: walk, car + walk or car only, with parking -->
   <section id="navView" class="view">
 
     <div class="nav-toolbar">
@@ -254,10 +318,14 @@
       <div class="select-pill to">
         <span class="dot"></span>
         <span class="pill-label">To</span>
-        <!-- the buildings are added by navigation.js from buildings.json -->
         <select id="toSelect" aria-label="Destination">
           <option value="">Select destination...</option>
         </select>
+      </div>
+      <div class="mode-toggle" role="group" aria-label="How are you travelling?">
+        <button type="button" data-nav-mode="walk" class="active" aria-pressed="true" title="Walk all the way">👣 Walk</button>
+        <button type="button" data-nav-mode="car" aria-pressed="false" title="Drive to the parking nearest your destination, then walk">🚗 Car + walk</button>
+        <button type="button" data-nav-mode="drive" aria-pressed="false" title="Drive all the way on the roads to the drop-off point nearest your destination">🚙 Car only</button>
       </div>
       <button class="btn-route" onclick="getRoute()">➹ Get Route</button>
     </div>
@@ -266,12 +334,29 @@
       <div class="map-card card">
         <div class="map-card-head">
           <span class="loc">📍 UNIZULU Campus</span>
-          <button type="button" id="stopRouteBtn" class="stop-route-btn" hidden>✕ End route</button>
+          <div class="head-actions">
+            <button type="button" id="setLocBtn" class="set-loc-btn" title="Location wrong? Tap here, then tap your real position on the map">📌 Set my location</button>
+            <button type="button" id="altRouteBtn" class="alt-route-btn" hidden>🔀 Alternate route</button>
+            <button type="button" id="parkFullBtn" class="park-full-btn" hidden title="This parking is full: flag it and get a new route to the next parking. Tap again at each full parking until you find a space.">🅿️ Full? Next parking</button>
+            <button type="button" id="parkedBtn" class="parked-btn" hidden title="You found a space: stop looking and walk to your destination">✓ Parked here</button>
+            <button type="button" id="closedBtn" class="closed-btn" hidden title="The path ahead is closed or blocked: find another way from where you are">🚧 Road closed</button>
+            <button type="button" id="stopRouteBtn" class="stop-route-btn" hidden>✕ End route</button>
+          </div>
         </div>
-        <!-- Leaflet draws the campus map here -->
         <div class="map-wrap">
           <div id="campusMap" role="region" aria-label="Campus map"></div>
-          <p id="zoomHint" class="zoom-hint" hidden>Zoom in to see buildings</p>
+          <p id="zoomHint" class="zoom-hint" hidden>Zoom in to see buildings and parking</p>
+          <div id="needLocBanner" class="need-loc" role="alert" hidden>
+            <span class="nl-icon">📍</span>
+            <span class="nl-text">We could not get your exact location.</span>
+            <button type="button" id="needLocBtn">📌 Set my location</button>
+          </div>
+          <div id="wrongWayBanner" class="wrong-way" role="alert" hidden>
+            <span class="ww-icon">⚠</span>
+            <span class="ww-text">Wrong direction!</span>
+            <button type="button" id="rerouteBtn">Re-route from here</button>
+          </div>
+          <p id="navToast" class="nav-toast" role="status" hidden></p>
         </div>
       </div>
 
@@ -279,22 +364,31 @@
         <div class="card nav-info-card">
           <div class="nav-info-icon">➹</div>
           <h3>Campus Navigator</h3>
-          <p>Choose where you are starting from and your destination, then tap <strong style="color:var(--text)">Get Route</strong>. With <strong style="color:var(--text)">Current location</strong>, the route follows you and updates as you walk.</p>
+          <p>Choose where you are starting from, your destination and how you travel (<strong style="color:var(--text)">👣 Walk</strong>, <strong style="color:var(--text)">🚗 Car + walk</strong> or <strong style="color:var(--text)">🚙 Car only</strong>), then tap <strong style="color:var(--text)">Get Route</strong>. The shortest route is shown first; tap <strong style="color:var(--text)">Alternate route</strong> for other ways.</p>
+          <p class="hint">On the map, <span class="leg-key leg-key-drive"></span> <strong style="color:var(--text)">dark blue</strong> is driven and <span class="leg-key leg-key-walk"></span> <strong style="color:var(--text)">green</strong> is walked. <strong style="color:var(--text)">P</strong> markers show the parkings: they appear when you zoom in, and a red one means a driver reported it full (whether there is space, you see when you get there). Found a parking full? Tap <strong style="color:var(--text)">🅿️ Full? Next parking</strong>: that parking is flagged and you get a new route from that parking to another one. Keep tapping at each full parking until you find a space, then tap <strong style="color:var(--text)">✓ Parked here</strong>.</p>
+          <p class="hint">With <strong style="color:var(--text)">Current location</strong>, the arrow moves with you and tells you which buildings you are passing. If you go the wrong way the route turns red; if you take another path or turn back, a new route is found from where you are. Path blocked? Tap <strong style="color:var(--text)">🚧 Road closed</strong>.</p>
           <p class="hint">You can also tap any place on the map to see it and get directions to it.</p>
           <div id="routeResult"></div>
+          <div id="routeChoices" class="route-choices" hidden></div>
+          <ul id="landmarkFeed" class="landmark-feed" aria-live="polite" hidden></ul>
         </div>
       </div>
     </div>
   </section>
 
+
 </main>
 
 <footer>University of Zululand · KwaDlangezwa 3886 · Campus AI Assistant v3.0</footer>
+</div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- shared start-up first, then the two parts: each part's logic is in its own file -->
+<!-- shared start-up first, then the three parts: each part's logic is in its own file -->
 <script src="js/app.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/explorer.js"></script>
 <script src="js/navigation.js"></script>
+<script src="js/offline.js"></script>
 </body>
 </html>
