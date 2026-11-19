@@ -18,7 +18,7 @@ database/           accounts_schema.sql (created on start) and the handbook load
 static/             the frontend: html pages, css, js, images
 templates/          admin.html (only served through /admin after the admin check)
 scripts/            make_admin.py
-sample_documents/          samplestudent documents for testing
+sample_documents/   sample student documents for testing
 ```
 
 ## Run it
