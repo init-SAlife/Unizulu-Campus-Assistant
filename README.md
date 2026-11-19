@@ -76,6 +76,8 @@ python app.py
   fixes, new sign-in tables, unused table removed).
 * `database/handbook_2026/` and `database/handbook_2023/`: the PDFs, CSVs and scripts the handbook
   data was first extracted with. Only needed to extract a handbook again.
+* `Campus_AI_Assistant_DB`: Postgres backup file containing only the handbook data not sensitive data
+
 
 ## Campus map
 
