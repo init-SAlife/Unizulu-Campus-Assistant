@@ -3,7 +3,7 @@
 **/.env
 
 # personal student documents (records, proof of registration)
-documents/
+
 
 # local only
 campus_env/

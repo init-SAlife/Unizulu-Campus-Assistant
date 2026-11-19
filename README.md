@@ -1,6 +1,6 @@
 # UNIZULU Campus AI Assistant
 
-Group 30 final-year project. One Flask app with four parts:
+One Flask app with four parts:
 
 * **AI Assistant**: answers questions from the FSAE handbooks (2026 and 2023) and checks registration from an uploaded proof of registration or academic record
 * **Programme & Module Explorer**: browse programmes and modules, free for everyone
